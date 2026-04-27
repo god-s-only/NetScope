@@ -18,7 +18,7 @@ navigation = "2.7.7"
 datastore = "1.0.0"
 gson = "2.10.1"
 timber = "5.0.1"
-ksp = "1.9.22-1.0.17"
+ksp = "2.0.21-1.0.26"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
