@@ -1,5 +1,6 @@
 package com.netscope.app.data.vpn
 
+import com.netscope.app.domain.model.HttpTransaction
 import com.netscope.app.domain.model.PacketInfo
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -22,12 +23,22 @@ class PacketEventBus @Inject constructor() {
     )
     val dnsEvents: SharedFlow<DnsEvent> = _dnsEvents.asSharedFlow()
 
+    private val _httpTransactions = MutableSharedFlow<HttpTransaction>(
+        replay = 0,
+        extraBufferCapacity = 500,
+    )
+    val httpTransactions: SharedFlow<HttpTransaction> = _httpTransactions.asSharedFlow()
+
     suspend fun emitPacket(packet: PacketInfo) {
         _packets.emit(packet)
     }
 
     suspend fun emitDnsEvent(event: DnsEvent) {
         _dnsEvents.emit(event)
+    }
+
+    suspend fun emitHttpTransaction(transaction: HttpTransaction) {
+        _httpTransactions.emit(transaction)
     }
 }
 
