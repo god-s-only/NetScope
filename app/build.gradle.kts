@@ -78,4 +78,5 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.gson)
     implementation(libs.timber)
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
 }
