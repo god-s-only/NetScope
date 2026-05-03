@@ -1,7 +1,9 @@
 package com.netscope.app.data.vpn
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
 import com.netscope.app.domain.model.AppInfo
 import com.netscope.app.domain.model.Protocol
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -16,27 +18,29 @@ import javax.inject.Singleton
 class UidResolver @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-
+    // cache UID → AppInfo to avoid repeated PackageManager lookups
     private val appInfoCache = mutableMapOf<Int, AppInfo?>()
 
-    private val portUidCache = mutableMapOf<Int, Int>()
-
+    /**
+     * On API 29+, /proc/net/tcp is restricted to an app's own sockets.
+     * This will return null for all other apps' traffic.
+     * We keep this as best-effort — it works for our own app's traffic.
+     */
     suspend fun resolveUid(
         sourcePort: Int,
         protocol: Protocol,
     ): Int? = withContext(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            // /proc/net restricted on API 29+ — skip the attempt
+            return@withContext null
+        }
         try {
-            portUidCache[sourcePort]?.let { return@withContext it }
-
             val procFile = when (protocol) {
                 Protocol.TCP -> "/proc/net/tcp"
                 Protocol.UDP -> "/proc/net/udp"
-                else -> return@withContext null
+                else         -> return@withContext null
             }
-
-            val uid = parseProcNet(procFile, sourcePort)
-            if (uid != null) portUidCache[sourcePort] = uid
-            uid
+            parseProcNet(procFile, sourcePort)
         } catch (e: Exception) {
             Timber.w(e, "Failed to resolve UID for port $sourcePort")
             null
@@ -44,30 +48,25 @@ class UidResolver @Inject constructor(
     }
 
     suspend fun resolveAppInfo(uid: Int): AppInfo? = withContext(Dispatchers.IO) {
+        if (uid <= 0) return@withContext null
         appInfoCache[uid]?.let { return@withContext it }
-
         try {
-            val pm = context.packageManager
+            val pm       = context.packageManager
             val packages = pm.getPackagesForUid(uid)
-
-            val appInfo = packages?.firstOrNull()?.let { packageName ->
-                val applicationInfo = pm.getApplicationInfo(packageName, 0)
-                val appName = pm.getApplicationLabel(applicationInfo).toString()
-                val isSystem = applicationInfo.flags and
-                        android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0
-
+            val appInfo  = packages?.firstOrNull()?.let { packageName ->
+                val info    = pm.getApplicationInfo(packageName, 0)
+                val name    = pm.getApplicationLabel(info).toString()
+                val isSystem = info.flags and ApplicationInfo.FLAG_SYSTEM != 0
                 AppInfo(
-                    uid = uid,
+                    uid         = uid,
                     packageName = packageName,
-                    appName = appName,
+                    appName     = name,
                     isSystemApp = isSystem,
                 )
             }
-
             appInfoCache[uid] = appInfo
             appInfo
         } catch (e: PackageManager.NameNotFoundException) {
-            Timber.w("No app found for UID $uid")
             appInfoCache[uid] = null
             null
         } catch (e: Exception) {
@@ -76,10 +75,7 @@ class UidResolver @Inject constructor(
         }
     }
 
-    suspend fun resolve(
-        sourcePort: Int,
-        protocol: Protocol,
-    ): AppInfo? {
+    suspend fun resolve(sourcePort: Int, protocol: Protocol): AppInfo? {
         val uid = resolveUid(sourcePort, protocol) ?: return null
         return resolveAppInfo(uid)
     }
@@ -87,33 +83,23 @@ class UidResolver @Inject constructor(
     private fun parseProcNet(path: String, targetPort: Int): Int? {
         val file = File(path)
         if (!file.exists() || !file.canRead()) return null
-
-        val targetPortHex = targetPort.toString(16).padStart(4, '0').uppercase()
-
+        val targetPortHex = targetPort.toString(16)
+            .padStart(4, '0').uppercase()
         return file.bufferedReader().use { reader ->
-            reader.readLine()
-
-            reader.lineSequence()
-                .mapNotNull { line ->
-                    try {
-                        val parts = line.trim().split("\\s+".toRegex())
-                        if (parts.size < 8) return@mapNotNull null
-
-                        val localAddress = parts[1]
-                        val portHex = localAddress.substringAfter(":")
-
-                        if (portHex.uppercase() != targetPortHex) return@mapNotNull null
-
-                        parts[7].toIntOrNull()
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-                .firstOrNull()
+            reader.readLine() // skip header
+            reader.lineSequence().mapNotNull { line ->
+                try {
+                    val parts = line.trim().split("\\s+".toRegex())
+                    if (parts.size < 8) return@mapNotNull null
+                    val portHex = parts[1].substringAfter(":")
+                    if (portHex.uppercase() != targetPortHex) return@mapNotNull null
+                    parts[7].toIntOrNull()
+                } catch (e: Exception) { null }
+            }.firstOrNull()
         }
     }
 
     fun clearCache() {
-        portUidCache.clear()
+        appInfoCache.clear()
     }
 }

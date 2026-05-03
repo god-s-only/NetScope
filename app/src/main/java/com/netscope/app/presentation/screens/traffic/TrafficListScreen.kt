@@ -157,6 +157,31 @@ fun TrafficListScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(NetScopeInfo.copy(alpha = 0.10f))
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector        = Icons.Default.Info,
+                                contentDescription = null,
+                                tint               = NetScopeInfo,
+                                modifier           = Modifier.size(18.dp),
+                            )
+                            Text(
+                                text  = "HTTP capture requires the NetScopeInterceptor " +
+                                        "embedded in the target app. VPN mode captures " +
+                                        "packet metadata only — not encrypted HTTPS bodies.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                            )
+                        }
+                    }
                     items(
                         items = state.transactions,
                         key = { it.id },
