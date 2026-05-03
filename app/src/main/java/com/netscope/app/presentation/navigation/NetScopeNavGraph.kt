@@ -1,6 +1,8 @@
 package com.netscope.app.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -8,23 +10,43 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.netscope.app.presentation.screens.connections.ConnectionsScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardScreen
+import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
 import com.netscope.app.presentation.screens.replay.ReplayScreen
 import com.netscope.app.presentation.screens.timeline.TimelineScreen
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
-import com.netscope.presentation.screens.dns.DnsScreen
 
 @Composable
-fun NetScopeNavGraph(navController: NavHostController) {
+fun NetScopeNavGraph(
+    navController: NavHostController,
+    onRequestVpnPermission: () -> Unit,
+    onStopVpn: () -> Unit,
+    onInstallCertificate: (ByteArray) -> Unit,
+    onDashboardReady: (DashboardViewModel) -> Unit,
+) {
     NavHost(
-        navController = navController,
+        navController    = navController,
         startDestination = NavRoutes.DASHBOARD,
     ) {
+
         composable(NavRoutes.DASHBOARD) {
+            val viewModel = hiltViewModel<DashboardViewModel>()
+
+            // pass ViewModel reference back to MainActivity
+            // so it can call onVpnStarted() after permission result
+            LaunchedEffect(viewModel) {
+                onDashboardReady(viewModel)
+            }
+
             DashboardScreen(
-                onNavigateToTraffic  = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
+                onRequestVpnPermission  = onRequestVpnPermission,
+                onStopVpn = onStopVpn,
+                onInstallCertificate = onInstallCertificate,
+                onNavigateToTraffic = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
                 onNavigateToDns = { navController.navigate(NavRoutes.DNS) },
                 onNavigateToConnections = { navController.navigate(NavRoutes.CONNECTIONS) },
+                onNavigateToTimeline = { navController.navigate(NavRoutes.TIMELINE) },
+                viewModel = viewModel,
             )
         }
 
@@ -38,43 +60,17 @@ fun NetScopeNavGraph(navController: NavHostController) {
         }
 
         composable(
-            route = NavRoutes.TRAFFIC_DETAIL,
+            route     = NavRoutes.TRAFFIC_DETAIL,
             arguments = listOf(
                 navArgument(NavArgs.TRANSACTION_ID) { type = NavType.StringType }
             ),
         ) {
             TrafficDetailScreen(
-                onNavigateBack  = { navController.popBackStack() },
+                onNavigateBack     = { navController.popBackStack() },
                 onNavigateToReplay = { id ->
                     navController.navigate(NavRoutes.replay(id))
                 },
             )
-        }
-
-        composable(NavRoutes.DNS) {
-            DnsScreen(onNavigateBack = { navController.popBackStack() })
-        }
-
-        composable(NavRoutes.CONNECTIONS) {
-            ConnectionsScreen(onNavigateBack = { navController.popBackStack() })
-        }
-
-        composable(NavRoutes.TIMELINE) {
-            TimelineScreen(
-                onNavigateBack     = { navController.popBackStack() },
-                onTransactionClick = { id ->
-                    navController.navigate(NavRoutes.trafficDetail(id))
-                },
-            )
-        }
-
-        composable(
-            route = NavRoutes.REPLAY,
-            arguments = listOf(
-                navArgument(NavArgs.TRANSACTION_ID) { type = NavType.StringType }
-            ),
-        ) {
-            ReplayScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }
