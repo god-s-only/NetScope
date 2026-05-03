@@ -1,12 +1,14 @@
 package com.netscope.app.presentation.screens.dashboard
 
+import android.content.Context
 import androidx.lifecycle.viewModelScope
-import com.netscope.app.data.vpn.VpnController
+import com.netscope.app.data.proxy.cert.CertificateManager
 import com.netscope.app.domain.usecase.DetectAnomaliesUseCase
 import com.netscope.app.domain.usecase.ObserveBandwidthUseCase
 import com.netscope.app.domain.usecase.ObserveConnectionsUseCase
 import com.netscope.app.presentation.base.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
@@ -15,13 +17,17 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val certificateManager: CertificateManager,
     private val observeBandwidthUseCase: ObserveBandwidthUseCase,
     private val observeConnectionsUseCase: ObserveConnectionsUseCase,
     private val detectAnomaliesUseCase: DetectAnomaliesUseCase,
-    private val vpnController: VpnController,
 ) : BaseViewModel<DashboardUiState>(DashboardUiState()) {
 
+    private val prefs get() = context.getSharedPreferences("netscope_prefs", Context.MODE_PRIVATE)
+
     init {
+        updateState { copy(isCertificateInstalled = isCertInstalled()) }
         observeLiveData()
     }
 
@@ -48,21 +54,21 @@ class DashboardViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    fun startCapture() {
-        viewModelScope.launch {
-            if (!vpnController.isVpnPermissionGranted()) {
-                updateState { copy(error = "VPN permission required") }
-                return@launch
-            }
-            vpnController.startCapture()
-            updateState { copy(isVpnActive = true) }
-        }
+
+    fun onVpnStarted() = updateState { copy(isVpnActive = true, error = null) }
+
+    fun onVpnStopped() = updateState { copy(isVpnActive = false) }
+
+    fun getCaCertificateBytes(): ByteArray =
+        certificateManager.getCaCertificateBytes()
+
+    fun markCertificateInstalled() {
+        prefs.edit().putBoolean("cert_installed", true).apply()
+        updateState { copy(isCertificateInstalled = true) }
     }
 
-    fun stopCapture() {
-        vpnController.stopCapture()
-        updateState { copy(isVpnActive = false) }
-    }
+    fun isCertInstalled(): Boolean =
+        prefs.getBoolean("cert_installed", false)
 
     fun dismissError() = updateState { copy(error = null) }
 }

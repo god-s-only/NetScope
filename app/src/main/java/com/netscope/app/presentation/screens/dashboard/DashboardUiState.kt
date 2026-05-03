@@ -6,7 +6,7 @@ import com.netscope.app.domain.usecase.DetectAnomaliesUseCase
 
 data class DashboardUiState(
     val isVpnActive: Boolean = false,
-    val isLoading: Boolean = false,
+    val isCertificateInstalled: Boolean = false,
     val totalUploadBytesPerSec: Long = 0L,
     val totalDownloadBytesPerSec: Long = 0L,
     val perAppBandwidth: List<BandwidthSnapshot> = emptyList(),
