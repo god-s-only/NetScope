@@ -80,4 +80,8 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.timber)
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
+
+    implementation(libs.conscrypt)
+    implementation(libs.bouncycastle.pkix)
+    implementation(libs.bouncycastle.prov)
 }
