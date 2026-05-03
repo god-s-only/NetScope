@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
+import com.netscope.app.presentation.screens.setup.ProxySetupScreen
 
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
 
@@ -41,9 +42,9 @@ fun NetScopeNavGraph(
                 onStopVpn = onStopVpn,
                 onInstallCertificate = onInstallCertificate,
                 onNavigateToTraffic = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
-                onNavigateToDns = { navController.navigate(NavRoutes.DNS) },
-                onNavigateToConnections = { navController.navigate(NavRoutes.CONNECTIONS) },
-                onNavigateToTimeline = { navController.navigate(NavRoutes.TIMELINE) },
+                onNavigateToDns = {  },
+                onNavigateToConnections = {  },
+                onNavigateToTimeline = {  },
                 viewModel = viewModel,
             )
         }
@@ -58,7 +59,7 @@ fun NetScopeNavGraph(
         }
 
         composable(
-            route     = NavRoutes.TRAFFIC_DETAIL,
+            route = NavRoutes.TRAFFIC_DETAIL,
             arguments = listOf(
                 navArgument(NavArgs.TRANSACTION_ID) { type = NavType.StringType }
             ),
@@ -67,6 +68,14 @@ fun NetScopeNavGraph(
                 onNavigateBack     = { navController.popBackStack() },
                 onNavigateToReplay = { id ->
                     navController.navigate(NavRoutes.replay(id))
+                },
+            )
+        }
+        composable(NavRoutes.SETUP) {
+            ProxySetupScreen(
+                onInstallCertificate = onInstallCertificate,
+                onNavigateToTraffic  = {
+                    navController.navigate(NavRoutes.TRAFFIC_LIST)
                 },
             )
         }
