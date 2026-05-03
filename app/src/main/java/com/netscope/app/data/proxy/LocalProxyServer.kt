@@ -1,27 +1,29 @@
 package com.netscope.app.data.proxy
 
+import android.util.Log
 import com.netscope.app.data.proxy.cert.CertificateManager
 import com.netscope.app.domain.model.HttpMethod
 import com.netscope.app.domain.model.HttpTransaction
-import com.netscope.app.domain.model.StatusCategory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
+import java.security.KeyStore
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
-import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManagerFactory
+
+private const val TAG = "LocalProxyServer"
 
 @Singleton
 class LocalProxyServer @Inject constructor(
@@ -29,398 +31,403 @@ class LocalProxyServer @Inject constructor(
     private val transactionEmitter: HttpTransactionEmitter,
 ) {
     companion object {
-        const val PROXY_PORT   = 8888
-        private const val BUFFER_SIZE = 8192
+        const val PORT = 8888
+        private const val MAX_BODY_BYTES = 500_000
     }
 
     private var serverSocket: ServerSocket? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var isRunning = false
 
     fun start() {
+        if (isRunning) {
+            Log.d(TAG, "Already running")
+            return
+        }
         scope.launch {
             try {
-                serverSocket = ServerSocket(PROXY_PORT)
-                Timber.d("LocalProxyServer started on port $PROXY_PORT")
-
-                while (true) {
-                    val clientSocket = serverSocket?.accept() ?: break
-                    launch {
-                        handleConnection(clientSocket)
-                    }
+                serverSocket = ServerSocket(PORT)
+                isRunning = true
+                Log.d(TAG, "Started on port $PORT")
+                while (isRunning) {
+                    val client = serverSocket?.accept() ?: break
+                    launch { handleClient(client) }
                 }
             } catch (e: Exception) {
-                Timber.e(e, "LocalProxyServer error")
+                Log.e(TAG, "Server error: ${e.message}")
+                isRunning = false
             }
         }
     }
 
     fun stop() {
+        isRunning = false
         serverSocket?.close()
         serverSocket = null
-        Timber.d("LocalProxyServer stopped")
+        Log.d(TAG, "Stopped")
     }
 
-    private suspend fun handleConnection(clientSocket: Socket) {
+    fun isRunning() = isRunning
+
+
+    private suspend fun handleClient(client: Socket) {
         try {
-            val input  = clientSocket.getInputStream()
-            val output = clientSocket.getOutputStream()
+            client.soTimeout = 30_000
+            val input  = client.getInputStream()
+            val output = client.getOutputStream()
+            val reader = input.bufferedReader()
 
-            val reader      = BufferedReader(InputStreamReader(input))
-            val requestLine = reader.readLine() ?: return
+            val requestLine = reader.readLine()?.trim() ?: return
+            Log.d(TAG, "Request: $requestLine")
 
-            Timber.d("Proxy received: $requestLine")
+            val parts = requestLine.split(" ")
+            if (parts.size < 3) return
 
-            val parts  = requestLine.trim().split(" ")
-            if (parts.size < 2) return
-
-            val method = parts[0]
+            val method = parts[0].uppercase()
             val target = parts[1]
 
-            if (method.equals("CONNECT", ignoreCase = true)) {
-                handleHttpsConnect(
-                    clientSocket = clientSocket,
-                    target       = target,
-                    reader       = reader,
-                    output       = output,
-                )
+            if (method == "CONNECT") {
+                handleConnect(client, target, reader, output)
             } else {
-                handleHttp(
-                    clientSocket = clientSocket,
-                    method       = method,
-                    target       = target,
-                    reader       = reader,
-                    output       = output,
-                )
+                handlePlainHttp(method, target, reader, output)
             }
         } catch (e: Exception) {
-            Timber.w(e, "handleConnection error")
+            Log.w(TAG, "Client error: ${e.message}")
         } finally {
-            runCatching { clientSocket.close() }
+            runCatching { client.close() }
         }
     }
 
 
-    private suspend fun handleHttpsConnect(
-        clientSocket: Socket,
+    private suspend fun handleConnect(
+        client: Socket,
         target: String,
         reader: BufferedReader,
         output: OutputStream,
     ) {
-        val (hostname, port) = parseHostPort(target, 443)
+        var line = reader.readLine()
+        while (!line.isNullOrBlank()) {
+            line = reader.readLine()
+        }
 
-        consumeHeaders(reader)
+        val (host, port) = splitHostPort(target, 443)
 
         output.write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
         output.flush()
 
-        val (hostCert, hostKey) = certificateManager.getCertificateForHost(hostname)
-
-        val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        val ks  = java.security.KeyStore.getInstance("JKS")
-        ks.load(null, null)
-        ks.setKeyEntry("host", hostKey, "".toCharArray(), arrayOf(hostCert))
-        kmf.init(ks, "".toCharArray())
-
-        val sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(kmf.keyManagers, null, null)
-
-        val sslSocket = sslContext.socketFactory
-            .createSocket(clientSocket, hostname, port, true) as SSLSocket
-        sslSocket.useClientMode = false
-
         try {
-            sslSocket.startHandshake()
+            val sslSocket = upgradeTls(client, host, port) ?: return
+            sslSocket.use {
+                val sslReader = it.inputStream.bufferedReader()
+                val sslOutput = it.outputStream
+
+                val firstLine = sslReader.readLine()?.trim() ?: return
+                val sslParts  = firstLine.split(" ")
+                if (sslParts.size < 2) return
+
+                val method = sslParts[0].uppercase()
+                val path   = sslParts[1]
+                val url    = "https://$host$path"
+
+                captureAndForward(
+                    method       = method,
+                    url          = url,
+                    host         = host,
+                    port         = port,
+                    path         = path,
+                    isHttps      = true,
+                    reader       = sslReader,
+                    clientOutput = sslOutput,
+                )
+            }
         } catch (e: Exception) {
-            Timber.w(e, "TLS handshake failed for $hostname — cert not trusted or pinned")
-            sslSocket.close()
-            return
+            Log.w(TAG, "TLS failed for $host — cert not trusted or app pins cert: ${e.message}")
         }
-        val sslReader = BufferedReader(InputStreamReader(sslSocket.inputStream))
-        val sslRequestLine = sslReader.readLine() ?: return
+    }
 
-        val parts  = sslRequestLine.trim().split(" ")
-        if (parts.size < 2) return
 
-        val method = parts[0]
-        val path   = parts[1]
+    private suspend fun handlePlainHttp(
+        method: String,
+        target: String,
+        reader: BufferedReader,
+        clientOutput: OutputStream,
+    ) {
+        val url  = if (target.startsWith("http")) target else "http://$target"
+        val host = extractHost(url) ?: return
+        val port = extractPort(url, 80)
+        val path = extractPath(url)
 
-        handleHttp(
-            clientSocket = sslSocket,
+        captureAndForward(
             method       = method,
-            target       = "https://$hostname$path",
-            reader       = sslReader,
-            output       = sslSocket.outputStream,
-            hostname     = hostname,
+            url          = url,
+            host         = host,
             port         = port,
-            isHttps      = true,
+            path         = path,
+            isHttps      = false,
+            reader       = reader,
+            clientOutput = clientOutput,
         )
     }
 
 
-    private suspend fun handleHttp(
-        clientSocket: Socket,
+    private suspend fun captureAndForward(
         method: String,
-        target: String,
+        url: String,
+        host: String,
+        port: Int,
+        path: String,
+        isHttps: Boolean,
         reader: BufferedReader,
-        output: OutputStream,
-        hostname: String? = null,
-        port: Int = 80,
-        isHttps: Boolean = false,
+        clientOutput: OutputStream,
     ) {
         val startMs = System.currentTimeMillis()
         val id      = UUID.randomUUID().toString()
 
-        val requestHeaders = mutableMapOf<String, String>()
-        var contentLength  = 0
-        var line           = reader.readLine()
+        val reqHeaders    = mutableMapOf<String, String>()
+        var contentLength = 0
 
+        var line = reader.readLine()
         while (!line.isNullOrBlank()) {
-            val colonIdx = line.indexOf(':')
-            if (colonIdx > 0) {
-                val key   = line.substring(0, colonIdx).trim()
-                val value = line.substring(colonIdx + 1).trim()
-                requestHeaders[key] = value
-                if (key.equals("Content-Length", ignoreCase = true)) {
-                    contentLength = value.toIntOrNull() ?: 0
+            val colon = line.indexOf(':')
+            if (colon > 0) {
+                val k = line.substring(0, colon).trim()
+                val v = line.substring(colon + 1).trim()
+                reqHeaders[k] = v
+                if (k.equals("Content-Length", ignoreCase = true)) {
+                    contentLength = v.toIntOrNull() ?: 0
                 }
             }
             line = reader.readLine()
         }
 
-        val requestBody = if (contentLength > 0) {
-            val bodyChars = CharArray(contentLength)
-            reader.read(bodyChars, 0, contentLength)
-            String(bodyChars)
+        val reqBody = if (contentLength > 0) {
+            val buf = CharArray(contentLength.coerceAtMost(MAX_BODY_BYTES))
+            reader.read(buf)
+            String(buf)
         } else null
 
-        val actualHost = hostname
-            ?: requestHeaders["Host"]
-            ?: parseHostFromUrl(target)
-            ?: return
-
-        val actualPort = if (isHttps) port else 80
-        val path       = if (isHttps) {
-            target.substringAfter("://").substringAfter("/", "").let { "/$it" }
-        } else {
-            target
-        }
-
-        val fullUrl = if (isHttps) target else "http://$actualHost$path"
-
-        Timber.d("Proxy → $method $fullUrl")
-
         try {
-            val serverSocket = if (isHttps) {
-                createProtectedSslSocket(actualHost, actualPort)
+            val serverSocket = Socket(host, port)
+            serverSocket.soTimeout = 30_000
+
+            val serverOut: OutputStream
+            val serverIn:  InputStream
+
+            if (isHttps) {
+                val ssl = SSLContext.getInstance("TLS")
+                ssl.init(null, null, null)
+                val sslSock = ssl.socketFactory.createSocket(
+                    serverSocket, host, port, true
+                ) as SSLSocket
+                sslSock.startHandshake()
+                serverOut = sslSock.outputStream
+                serverIn  = sslSock.inputStream
             } else {
-                createProtectedSocket(actualHost, actualPort)
+                serverOut = serverSocket.outputStream
+                serverIn  = serverSocket.inputStream
             }
 
-            serverSocket.use { socket ->
-                val serverOut = socket.getOutputStream()
-                val serverIn  = socket.getInputStream()
-
-                val requestBuilder = StringBuilder()
-                requestBuilder.append("$method $path HTTP/1.1\r\n")
-                requestHeaders.forEach { (k, v) ->
-                    if (!k.equals("Connection", ignoreCase = true) &&
-                        !k.equals("Proxy-Connection", ignoreCase = true)) {
-                        requestBuilder.append("$k: $v\r\n")
-                    }
+            val reqBuilder = StringBuilder()
+            reqBuilder.append("$method $path HTTP/1.1\r\n")
+            reqHeaders.forEach { (k, v) ->
+                if (!k.equals("Proxy-Connection", ignoreCase = true) &&
+                    !k.equals("Connection", ignoreCase = true)) {
+                    reqBuilder.append("$k: $v\r\n")
                 }
-                requestBuilder.append("Connection: close\r\n")
-                requestBuilder.append("\r\n")
-                requestBody?.let { requestBuilder.append(it) }
-
-                serverOut.write(requestBuilder.toString().toByteArray())
-                serverOut.flush()
-
-                val responseReader = BufferedReader(InputStreamReader(serverIn))
-                val statusLine     = responseReader.readLine() ?: return@use
-
-                val statusParts   = statusLine.split(" ")
-                val statusCode    = statusParts.getOrNull(1)?.toIntOrNull() ?: 0
-                val statusMessage = statusParts.drop(2).joinToString(" ")
-
-                val responseHeaders    = mutableMapOf<String, String>()
-                var responseContentLen = -1
-                var transferEncoding   = ""
-
-                var rLine = responseReader.readLine()
-                while (!rLine.isNullOrBlank()) {
-                    val colonIdx = rLine.indexOf(':')
-                    if (colonIdx > 0) {
-                        val k = rLine.substring(0, colonIdx).trim()
-                        val v = rLine.substring(colonIdx + 1).trim()
-                        responseHeaders[k] = v
-                        when {
-                            k.equals("Content-Length", ignoreCase = true) ->
-                                responseContentLen = v.toIntOrNull() ?: -1
-                            k.equals("Transfer-Encoding", ignoreCase = true) ->
-                                transferEncoding = v
-                        }
-                    }
-                    rLine = responseReader.readLine()
-                }
-
-                // read response body
-                val responseBody = readResponseBody(
-                    reader           = responseReader,
-                    contentLength    = responseContentLen,
-                    transferEncoding = transferEncoding,
-                )
-
-                val durationMs = System.currentTimeMillis() - startMs
-
-                val responseBuilder = StringBuilder()
-                responseBuilder.append("$statusLine\r\n")
-                responseHeaders.forEach { (k, v) ->
-                    if (!k.equals("Transfer-Encoding", ignoreCase = true)) {
-                        responseBuilder.append("$k: $v\r\n")
-                    }
-                }
-                responseBuilder.append("Content-Length: ${responseBody.length}\r\n")
-                responseBuilder.append("Connection: close\r\n")
-                responseBuilder.append("\r\n")
-                responseBuilder.append(responseBody)
-
-                output.write(responseBuilder.toString().toByteArray())
-                output.flush()
-
-                val transaction = HttpTransaction(
-                    id                = id,
-                    timestampMs       = startMs,
-                    url               = fullUrl,
-                    host              = actualHost,
-                    path              = path,
-                    method            = mapMethod(method),
-                    requestHeaders    = requestHeaders,
-                    requestBody       = requestBody,
-                    requestSizeBytes  = requestBody?.length?.toLong() ?: 0L,
-                    responseCode      = statusCode,
-                    responseMessage   = statusMessage,
-                    responseHeaders   = responseHeaders,
-                    responseBody      = responseBody,
-                    responseSizeBytes = responseBody.length.toLong(),
-                    durationMs        = durationMs,
-                    protocol          = if (isHttps) "HTTPS" else "HTTP",
-                    isReplay          = false,
-                    error             = null,
-                )
-
-                transactionEmitter.emit(transaction)
-                Timber.d("Captured: $method $fullUrl → $statusCode (${durationMs}ms)")
             }
-        } catch (e: Exception) {
-            Timber.w(e, "Failed to forward request to $actualHost")
+            reqBuilder.append("Connection: close\r\n\r\n")
+            reqBody?.let { reqBuilder.append(it) }
+            serverOut.write(reqBuilder.toString().toByteArray())
+            serverOut.flush()
 
+            val serverReader  = serverIn.bufferedReader()
+            val statusLine    = serverReader.readLine()?.trim() ?: return
+            val statusParts   = statusLine.split(" ", limit = 3)
+            val statusCode    = statusParts.getOrNull(1)?.toIntOrNull() ?: 0
+            val statusMessage = statusParts.getOrNull(2) ?: ""
+
+            val respHeaders      = mutableMapOf<String, String>()
+            var respContentLen   = -1
+            var transferEncoding = ""
+
+            var rLine = serverReader.readLine()
+            while (!rLine.isNullOrBlank()) {
+                val colon = rLine.indexOf(':')
+                if (colon > 0) {
+                    val k = rLine.substring(0, colon).trim()
+                    val v = rLine.substring(colon + 1).trim()
+                    respHeaders[k] = v
+                    when {
+                        k.equals("Content-Length", ignoreCase = true) ->
+                            respContentLen = v.toIntOrNull() ?: -1
+                        k.equals("Transfer-Encoding", ignoreCase = true) ->
+                            transferEncoding = v
+                    }
+                }
+                rLine = serverReader.readLine()
+            }
+
+            val respBody = readBody(serverReader, respContentLen, transferEncoding)
             val durationMs = System.currentTimeMillis() - startMs
+
+            val respBuilder = StringBuilder()
+            respBuilder.append("$statusLine\r\n")
+            respHeaders.forEach { (k, v) ->
+                if (!k.equals("Transfer-Encoding", ignoreCase = true)) {
+                    respBuilder.append("$k: $v\r\n")
+                }
+            }
+            respBuilder.append("Content-Length: ${respBody.toByteArray().size}\r\n")
+            respBuilder.append("Connection: close\r\n\r\n")
+            respBuilder.append(respBody)
+            clientOutput.write(respBuilder.toString().toByteArray())
+            clientOutput.flush()
+
+            runCatching { serverSocket.close() }
+
             val transaction = HttpTransaction(
                 id                = id,
                 timestampMs       = startMs,
-                url               = fullUrl,
-                host              = actualHost,
+                url               = url,
+                host              = host,
                 path              = path,
-                method            = mapMethod(method),
-                requestHeaders    = requestHeaders,
-                requestBody       = requestBody,
-                requestSizeBytes  = requestBody?.length?.toLong() ?: 0L,
-                responseCode      = null,
-                responseMessage   = null,
-                responseHeaders   = emptyMap(),
-                responseBody      = null,
-                responseSizeBytes = 0L,
+                method            = parseMethod(method),
+                requestHeaders    = reqHeaders,
+                requestBody       = reqBody,
+                requestSizeBytes  = reqBody?.toByteArray()?.size?.toLong() ?: 0L,
+                responseCode      = statusCode,
+                responseMessage   = statusMessage,
+                responseHeaders   = respHeaders,
+                responseBody      = respBody,
+                responseSizeBytes = respBody.toByteArray().size.toLong(),
                 durationMs        = durationMs,
                 protocol          = if (isHttps) "HTTPS" else "HTTP",
                 isReplay          = false,
-                error             = e.message ?: "Connection failed",
+                error             = null,
             )
-            transactionEmitter.emit(transaction)
 
-            output.write("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n".toByteArray())
-            output.flush()
+            transactionEmitter.emit(transaction)
+            Log.d(TAG, "Captured: $method $url → $statusCode (${durationMs}ms)")
+
+        } catch (e: Exception) {
+            val durationMs = System.currentTimeMillis() - startMs
+            Log.w(TAG, "Forward failed for $host: ${e.message}")
+
+            transactionEmitter.emit(
+                HttpTransaction(
+                    id                = id,
+                    timestampMs       = startMs,
+                    url               = url,
+                    host              = host,
+                    path              = path,
+                    method            = parseMethod(method),
+                    requestHeaders    = reqHeaders,
+                    requestBody       = reqBody,
+                    requestSizeBytes  = reqBody?.toByteArray()?.size?.toLong() ?: 0L,
+                    responseCode      = null,
+                    responseMessage   = null,
+                    responseHeaders   = emptyMap(),
+                    responseBody      = null,
+                    responseSizeBytes = 0L,
+                    durationMs        = durationMs,
+                    protocol          = if (isHttps) "HTTPS" else "HTTP",
+                    isReplay          = false,
+                    error             = e.message ?: "Connection failed",
+                )
+            )
+
+            runCatching {
+                clientOutput.write(
+                    "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n".toByteArray()
+                )
+                clientOutput.flush()
+            }
         }
     }
 
+    private fun upgradeTls(client: Socket, host: String, port: Int): SSLSocket? {
+        return try {
+            val (cert, key) = certificateManager.getCertificateForHost(host)
 
-    private fun createProtectedSocket(host: String, port: Int): Socket {
-        val socket = ProtectedSocketHolder.createProtectedSocket()
-            ?: Socket() // fallback if VPN not active
-        socket.connect(java.net.InetSocketAddress(host, port), 10_000)
-        return socket
+            val ks = KeyStore.getInstance(KeyStore.getDefaultType())
+            ks.load(null, null)
+            ks.setKeyEntry("key", key, "".toCharArray(), arrayOf(cert))
+
+            val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+            kmf.init(ks, "".toCharArray())
+
+            val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+            tmf.init(null as KeyStore?)
+
+            val sslCtx = SSLContext.getInstance("TLS")
+            sslCtx.init(kmf.keyManagers, tmf.trustManagers, null)
+
+            val sslSocket = sslCtx.socketFactory
+                .createSocket(client, host, port, true) as SSLSocket
+            sslSocket.useClientMode = false
+            sslSocket.startHandshake()
+            sslSocket
+        } catch (e: Exception) {
+            Log.w(TAG, "upgradeTls failed for $host: ${e.message}")
+            null
+        }
     }
 
-    private fun createProtectedSslSocket(host: String, port: Int): Socket {
-        val plainSocket = ProtectedSocketHolder.createProtectedSocket()
-            ?: Socket()
-        plainSocket.connect(java.net.InetSocketAddress(host, port), 10_000)
-
-        val sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(null, null, null)
-
-        return (sslContext.socketFactory as SSLSocketFactory)
-            .createSocket(plainSocket, host, port, true) as SSLSocket
-    }
-
-    private fun readResponseBody(
+    private fun readBody(
         reader: BufferedReader,
         contentLength: Int,
         transferEncoding: String,
     ): String {
         return try {
-            if (transferEncoding.equals("chunked", ignoreCase = true)) {
-                readChunkedBody(reader)
-            } else if (contentLength > 0) {
-                val chars = CharArray(contentLength)
-                reader.read(chars, 0, contentLength)
-                String(chars)
-            } else {
-                reader.readText()
+            when {
+                transferEncoding.equals("chunked", ignoreCase = true) -> {
+                    val sb = StringBuilder()
+                    while (true) {
+                        val sizeLine  = reader.readLine()?.trim() ?: break
+                        val chunkSize = sizeLine.toIntOrNull(16) ?: break
+                        if (chunkSize == 0) break
+                        val buf = CharArray(chunkSize.coerceAtMost(MAX_BODY_BYTES))
+                        reader.read(buf)
+                        sb.append(buf)
+                        reader.readLine()
+                    }
+                    sb.toString()
+                }
+                contentLength > 0 -> {
+                    val buf = CharArray(contentLength.coerceAtMost(MAX_BODY_BYTES))
+                    reader.read(buf)
+                    String(buf)
+                }
+                else -> reader.readText()
             }
         } catch (e: Exception) {
-            Timber.w(e, "Failed to read response body")
+            Log.w(TAG, "readBody error: ${e.message}")
             ""
         }
     }
 
-    private fun readChunkedBody(reader: BufferedReader): String {
-        val sb = StringBuilder()
-        while (true) {
-            val sizeLine  = reader.readLine()?.trim() ?: break
-            val chunkSize = sizeLine.toIntOrNull(16) ?: break
-            if (chunkSize == 0) break
-            val chars = CharArray(chunkSize)
-            reader.read(chars, 0, chunkSize)
-            sb.append(chars)
-            reader.readLine()
-        }
-        return sb.toString()
-    }
 
-    private fun consumeHeaders(reader: BufferedReader) {
-        var line = reader.readLine()
-        while (!line.isNullOrBlank()) {
-            line = reader.readLine()
-        }
-    }
-
-    private fun parseHostPort(target: String, defaultPort: Int): Pair<String, Int> {
+    private fun splitHostPort(target: String, default: Int): Pair<String, Int> {
         val parts = target.split(":")
-        return if (parts.size == 2) {
-            Pair(parts[0], parts[1].toIntOrNull() ?: defaultPort)
-        } else {
-            Pair(target, defaultPort)
-        }
+        return Pair(parts[0], parts.getOrNull(1)?.toIntOrNull() ?: default)
     }
 
-    private fun parseHostFromUrl(url: String): String? {
-        return try {
-            val withScheme = if (!url.startsWith("http")) "http://$url" else url
-            java.net.URL(withScheme).host
-        } catch (e: Exception) { null }
-    }
+    private fun extractHost(url: String): String? = try {
+        java.net.URL(url).host
+    } catch (e: Exception) { null }
 
-    private fun mapMethod(method: String): HttpMethod = when (method.uppercase()) {
+    private fun extractPort(url: String, default: Int): Int = try {
+        val p = java.net.URL(url).port
+        if (p == -1) default else p
+    } catch (e: Exception) { default }
+
+    private fun extractPath(url: String): String = try {
+        val u = java.net.URL(url)
+        val path = u.path.ifEmpty { "/" }
+        if (u.query != null) "$path?${u.query}" else path
+    } catch (e: Exception) { "/" }
+
+    private fun parseMethod(method: String): HttpMethod = when (method) {
         "GET"     -> HttpMethod.GET
         "POST"    -> HttpMethod.POST
         "PUT"     -> HttpMethod.PUT
