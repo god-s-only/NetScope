@@ -18,8 +18,6 @@ import com.netscope.app.presentation.screens.traffic.TrafficListScreen
 @Composable
 fun NetScopeNavGraph(
     navController: NavHostController,
-    onRequestVpnPermission: () -> Unit,
-    onStopVpn: () -> Unit,
     onInstallCertificate: (ByteArray) -> Unit,
     onDashboardReady: (DashboardViewModel) -> Unit,
 ) {
@@ -38,8 +36,8 @@ fun NetScopeNavGraph(
             }
 
             DashboardScreen(
-                onRequestVpnPermission  = onRequestVpnPermission,
-                onStopVpn = onStopVpn,
+                onRequestVpnPermission  = {},
+                onStopVpn = {},
                 onInstallCertificate = onInstallCertificate,
                 onNavigateToTraffic = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
                 onNavigateToDns = {  },
