@@ -22,8 +22,6 @@ object NetworkModule {
         netScopeInterceptor: NetScopeInterceptor,
     ): OkHttpClient =
         OkHttpClient.Builder()
-            .addInterceptor(netScopeInterceptor)
-            .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build()

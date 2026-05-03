@@ -8,12 +8,10 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.netscope.app.presentation.screens.connections.ConnectionsScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
-import com.netscope.app.presentation.screens.replay.ReplayScreen
-import com.netscope.app.presentation.screens.timeline.TimelineScreen
+
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
 
 @Composable

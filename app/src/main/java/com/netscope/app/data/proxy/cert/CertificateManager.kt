@@ -1,6 +1,7 @@
 package com.netscope.app.data.proxy.cert
 
 import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
@@ -24,7 +25,7 @@ import javax.inject.Singleton
 
 @Singleton
 class CertificateManager @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
 ) {
     companion object {
         private const val CA_ALIAS       = "netscope_ca"
