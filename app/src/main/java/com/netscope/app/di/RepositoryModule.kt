@@ -1,10 +1,10 @@
 package com.netscope.app.di
 
-import com.netscope.app.data.repostiory.AppInfoRepositoryImpl
-import com.netscope.app.data.repostiory.BandwidthRepositoryImpl
-import com.netscope.app.data.repostiory.ConnectionRepositoryImpl
-import com.netscope.app.data.repostiory.DnsRepositoryImpl
-import com.netscope.app.data.repostiory.TrafficRepositoryImpl
+import com.netscope.app.data.repository.AppInfoRepositoryImpl
+import com.netscope.app.data.repository.BandwidthRepositoryImpl
+import com.netscope.app.data.repository.ConnectionRepositoryImpl
+import com.netscope.app.data.repository.DnsRepositoryImpl
+import com.netscope.app.data.repository.TrafficRepositoryImpl
 import com.netscope.app.domain.repository.AppInfoRepository
 import com.netscope.app.domain.repository.BandwidthRepository
 import com.netscope.app.domain.repository.ConnectionRepository
