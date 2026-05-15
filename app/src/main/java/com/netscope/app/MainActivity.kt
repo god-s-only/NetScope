@@ -1,4 +1,4 @@
-package com.netscope.app
+package com.netscope.app.presentation
 
 import android.os.Bundle
 import android.security.KeyChain

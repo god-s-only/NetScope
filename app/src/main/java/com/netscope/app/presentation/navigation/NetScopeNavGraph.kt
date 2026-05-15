@@ -12,7 +12,6 @@ import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
 import com.netscope.app.presentation.screens.setup.ProxySetupScreen
-
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
 
 @Composable
@@ -28,22 +27,21 @@ fun NetScopeNavGraph(
 
         composable(NavRoutes.DASHBOARD) {
             val viewModel = hiltViewModel<DashboardViewModel>()
-
-            // pass ViewModel reference back to MainActivity
-            // so it can call onVpnStarted() after permission result
-            LaunchedEffect(viewModel) {
-                onDashboardReady(viewModel)
-            }
-
+            LaunchedEffect(viewModel) { onDashboardReady(viewModel) }
             DashboardScreen(
-                onRequestVpnPermission  = {},
-                onStopVpn = {},
                 onInstallCertificate = onInstallCertificate,
-                onNavigateToTraffic = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
-                onNavigateToDns = {  },
-                onNavigateToConnections = {  },
-                onNavigateToTimeline = {  },
+                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
+                onNavigateToTraffic  = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
                 viewModel = viewModel,
+            )
+        }
+
+        composable(NavRoutes.SETUP) {
+            ProxySetupScreen(
+                onInstallCertificate = onInstallCertificate,
+                onNavigateToTraffic  = {
+                    navController.navigate(NavRoutes.TRAFFIC_LIST)
+                },
             )
         }
 
@@ -57,7 +55,7 @@ fun NetScopeNavGraph(
         }
 
         composable(
-            route = NavRoutes.TRAFFIC_DETAIL,
+            route     = NavRoutes.TRAFFIC_DETAIL,
             arguments = listOf(
                 navArgument(NavArgs.TRANSACTION_ID) { type = NavType.StringType }
             ),
@@ -69,13 +67,6 @@ fun NetScopeNavGraph(
                 },
             )
         }
-        composable(NavRoutes.SETUP) {
-            ProxySetupScreen(
-                onInstallCertificate = onInstallCertificate,
-                onNavigateToTraffic  = {
-                    navController.navigate(NavRoutes.TRAFFIC_LIST)
-                },
-            )
-        }
+
     }
 }
