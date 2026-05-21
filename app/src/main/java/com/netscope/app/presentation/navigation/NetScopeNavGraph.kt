@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
+import com.netscope.app.presentation.screens.dns.DnsScreen
 import com.netscope.app.presentation.screens.setup.ProxySetupScreen
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
 
@@ -30,8 +31,9 @@ fun NetScopeNavGraph(
             LaunchedEffect(viewModel) { onDashboardReady(viewModel) }
             DashboardScreen(
                 onInstallCertificate = onInstallCertificate,
-                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
+                onNavigateToSetup    = { navController.navigate(NavRoutes.SETUP) },
                 onNavigateToTraffic  = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
+                onNavigateToDns      = { navController.navigate(NavRoutes.DNS) },
                 viewModel = viewModel,
             )
         }
@@ -67,6 +69,13 @@ fun NetScopeNavGraph(
                 },
             )
         }
+
+        composable(NavRoutes.DNS) {
+            DnsScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
 
     }
 }

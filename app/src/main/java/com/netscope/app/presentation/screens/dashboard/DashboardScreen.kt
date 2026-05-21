@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -61,6 +62,7 @@ fun DashboardScreen(
     onInstallCertificate: (ByteArray) -> Unit,
     onNavigateToSetup: () -> Unit,
     onNavigateToTraffic: () -> Unit,
+    onNavigateToDns: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -134,12 +136,23 @@ fun DashboardScreen(
             }
 
             item {
-                QuickNavCard(
-                    icon    = Icons.Default.List,
-                    label   = "HTTP Traffic",
-                    onClick = onNavigateToTraffic,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    QuickNavCard(
+                        icon     = Icons.Default.List,
+                        label    = "HTTP Traffic",
+                        onClick  = onNavigateToTraffic,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon     = Icons.Default.Dns,
+                        label    = "DNS Log",
+                        onClick  = onNavigateToDns,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
             if (state.anomalies.isNotEmpty()) {
