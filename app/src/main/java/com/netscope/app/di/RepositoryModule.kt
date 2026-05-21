@@ -26,21 +26,19 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindConnectionRepository(
-        impl: ConnectionRepositoryImpl,
-    ): ConnectionRepository
-
-    @Binds
-    @Singleton
     abstract fun bindDnsRepository(
         impl: DnsRepositoryImpl,
     ): DnsRepository
 
     @Binds
     @Singleton
+    abstract fun bindConnectionRepository(
+        impl: ConnectionRepositoryImpl,
+    ): ConnectionRepository
+
+    @Binds
+    @Singleton
     abstract fun bindBandwidthRepository(
         impl: BandwidthRepositoryImpl,
     ): BandwidthRepository
-
-
 }
