@@ -14,6 +14,7 @@ import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
 import com.netscope.app.presentation.screens.dns.DnsScreen
 import com.netscope.app.presentation.screens.replay.ReplayScreen
 import com.netscope.app.presentation.screens.setup.ProxySetupScreen
+import com.netscope.app.presentation.screens.timeline.TimelineScreen
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
 
 @Composable
@@ -23,7 +24,7 @@ fun NetScopeNavGraph(
     onDashboardReady: (DashboardViewModel) -> Unit,
 ) {
     NavHost(
-        navController    = navController,
+        navController = navController,
         startDestination = NavRoutes.DASHBOARD,
     ) {
 
@@ -32,9 +33,10 @@ fun NetScopeNavGraph(
             LaunchedEffect(viewModel) { onDashboardReady(viewModel) }
             DashboardScreen(
                 onInstallCertificate = onInstallCertificate,
-                onNavigateToSetup    = { navController.navigate(NavRoutes.SETUP) },
-                onNavigateToTraffic  = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
-                onNavigateToDns      = { navController.navigate(NavRoutes.DNS) },
+                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
+                onNavigateToTraffic = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
+                onNavigateToDns = { navController.navigate(NavRoutes.DNS) },
+                onNavigateToTimeline = { navController.navigate(NavRoutes.TIMELINE) },
                 viewModel = viewModel,
             )
         }
@@ -42,7 +44,7 @@ fun NetScopeNavGraph(
         composable(NavRoutes.SETUP) {
             ProxySetupScreen(
                 onInstallCertificate = onInstallCertificate,
-                onNavigateToTraffic  = {
+                onNavigateToTraffic = {
                     navController.navigate(NavRoutes.TRAFFIC_LIST)
                 },
             )
@@ -58,13 +60,13 @@ fun NetScopeNavGraph(
         }
 
         composable(
-            route     = NavRoutes.TRAFFIC_DETAIL,
+            route = NavRoutes.TRAFFIC_DETAIL,
             arguments = listOf(
                 navArgument(NavArgs.TRANSACTION_ID) { type = NavType.StringType }
             ),
         ) {
             TrafficDetailScreen(
-                onNavigateBack     = { navController.popBackStack() },
+                onNavigateBack = { navController.popBackStack() },
                 onNavigateToReplay = { id ->
                     navController.navigate(NavRoutes.replay(id))
                 },
@@ -72,13 +74,25 @@ fun NetScopeNavGraph(
         }
 
         composable(NavRoutes.DNS) {
-            DnsScreen(
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
-        composable(NavRoutes.REPLAY){
-            ReplayScreen({navController.popBackStack()})
+            DnsScreen(onNavigateBack = { navController.popBackStack() })
         }
 
+        composable(NavRoutes.TIMELINE) {
+            TimelineScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onTransactionClick = { id ->
+                    navController.navigate(NavRoutes.trafficDetail(id))
+                },
+            )
+        }
+
+        composable(
+            route = NavRoutes.REPLAY,
+            arguments = listOf(
+                navArgument(NavArgs.TRANSACTION_ID) { type = NavType.StringType }
+            ),
+        ) {
+            ReplayScreen(onNavigateBack = { navController.popBackStack() })
+        }
     }
 }

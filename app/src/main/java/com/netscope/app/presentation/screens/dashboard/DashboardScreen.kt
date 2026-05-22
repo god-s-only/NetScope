@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShieldMoon
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -63,6 +64,7 @@ fun DashboardScreen(
     onNavigateToSetup: () -> Unit,
     onNavigateToTraffic: () -> Unit,
     onNavigateToDns: () -> Unit,
+    onNavigateToTimeline: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -141,15 +143,21 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     QuickNavCard(
-                        icon     = Icons.Default.List,
-                        label    = "HTTP Traffic",
-                        onClick  = onNavigateToTraffic,
+                        icon = Icons.Default.List,
+                        label = "HTTP",
+                        onClick = onNavigateToTraffic,
                         modifier = Modifier.weight(1f),
                     )
                     QuickNavCard(
-                        icon     = Icons.Default.Dns,
-                        label    = "DNS Log",
-                        onClick  = onNavigateToDns,
+                        icon = Icons.Default.Dns,
+                        label = "DNS",
+                        onClick = onNavigateToDns,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.Timeline,
+                        label = "Timeline",
+                        onClick = onNavigateToTimeline,
                         modifier = Modifier.weight(1f),
                     )
                 }
