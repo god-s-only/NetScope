@@ -12,6 +12,7 @@ import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
 import com.netscope.app.presentation.screens.dns.DnsScreen
+import com.netscope.app.presentation.screens.replay.ReplayScreen
 import com.netscope.app.presentation.screens.setup.ProxySetupScreen
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
 
@@ -75,7 +76,9 @@ fun NetScopeNavGraph(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
-
+        composable(NavRoutes.REPLAY){
+            ReplayScreen({navController.popBackStack()})
+        }
 
     }
 }
