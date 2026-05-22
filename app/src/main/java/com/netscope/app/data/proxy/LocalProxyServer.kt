@@ -117,31 +117,32 @@ class LocalProxyServer @Inject constructor(
 
         try {
             val sslSocket = upgradeTls(client, host, port) ?: return
+            Log.d(TAG, "TLS upgrade success for $host")
+
             sslSocket.use {
                 val sslReader = it.inputStream.bufferedReader()
                 val sslOutput = it.outputStream
 
                 val firstLine = sslReader.readLine()?.trim() ?: return
-                val sslParts  = firstLine.split(" ")
+                val sslParts = firstLine.split(" ")
                 if (sslParts.size < 2) return
 
                 val method = sslParts[0].uppercase()
-                val path   = sslParts[1]
-                val url    = "https://$host$path"
+                val path = sslParts[1]
 
                 captureAndForward(
-                    method       = method,
-                    url          = url,
-                    host         = host,
-                    port         = port,
-                    path         = path,
-                    isHttps      = true,
-                    reader       = sslReader,
+                    method = method,
+                    targetUrl = "https://$host$path",
+                    hostHint = host,
+                    portHint = port,
+                    pathHint = path,
+                    isHttps = true,
+                    reader = sslReader,
                     clientOutput = sslOutput,
                 )
             }
         } catch (e: Exception) {
-            Log.w(TAG, "TLS failed for $host — cert not trusted or app pins cert: ${e.message}")
+            Log.w(TAG, "CONNECT failed for $host: ${e.message}")
         }
     }
 
@@ -152,19 +153,21 @@ class LocalProxyServer @Inject constructor(
         reader: BufferedReader,
         clientOutput: OutputStream,
     ) {
-        val url  = if (target.startsWith("http")) target else "http://$target"
-        val host = extractHost(url) ?: return
-        val port = extractPort(url, 80)
-        val path = extractPath(url)
+        val isAbsolute = target.startsWith("http://", ignoreCase = true)
+
+        val url = if (isAbsolute) target else null
+        val hostFromUrl = if (isAbsolute) extractHost(target) else null
+        val portFromUrl = if (isAbsolute) extractPort(target, 80) else 80
+        val pathFromUrl = if (isAbsolute) extractPath(target) else target
 
         captureAndForward(
-            method       = method,
-            url          = url,
-            host         = host,
-            port         = port,
-            path         = path,
-            isHttps      = false,
-            reader       = reader,
+            method = method,
+            targetUrl = url,
+            hostHint = hostFromUrl,
+            portHint = portFromUrl,
+            pathHint = pathFromUrl,
+            isHttps = false,
+            reader = reader,
             clientOutput = clientOutput,
         )
     }
@@ -172,18 +175,19 @@ class LocalProxyServer @Inject constructor(
 
     private suspend fun captureAndForward(
         method: String,
-        url: String,
-        host: String,
-        port: Int,
-        path: String,
+        targetUrl: String?,
+        hostHint: String?,
+        portHint: Int,
+        pathHint: String,
         isHttps: Boolean,
         reader: BufferedReader,
         clientOutput: OutputStream,
+        hostnameForTls: String? = null,
     ) {
         val startMs = System.currentTimeMillis()
-        val id      = UUID.randomUUID().toString()
+        val id = UUID.randomUUID().toString()
 
-        val reqHeaders    = mutableMapOf<String, String>()
+        val reqHeaders = mutableMapOf<String, String>()
         var contentLength = 0
 
         var line = reader.readLine()
@@ -200,18 +204,44 @@ class LocalProxyServer @Inject constructor(
             line = reader.readLine()
         }
 
+        val hostHeader = reqHeaders["Host"]?.trim() ?: ""
+        val host = when {
+            !hostHint.isNullOrBlank() -> hostHint
+            hostHeader.contains(":") -> hostHeader.substringBefore(":")
+            hostHeader.isNotBlank() -> hostHeader
+            else -> {
+                Log.e(TAG, "Cannot determine host for request $method $pathHint")
+                clientOutput.write(
+                    "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n".toByteArray()
+                )
+                return
+            }
+        }
+
+        val port = when {
+            portHint != 80 || isHttps -> portHint
+            hostHeader.contains(":") ->
+                hostHeader.substringAfter(":").toIntOrNull() ?: portHint
+            else -> portHint
+        }
+
+        val path = pathHint
+        val url = targetUrl ?: if (isHttps) "https://$host$path" else "http://$host$path"
+
         val reqBody = if (contentLength > 0) {
             val buf = CharArray(contentLength.coerceAtMost(MAX_BODY_BYTES))
             reader.read(buf)
             String(buf)
         } else null
 
+        Log.d(TAG, "Forwarding: $method $url → $host:$port")
+
         try {
             val serverSocket = Socket(host, port)
             serverSocket.soTimeout = 30_000
 
             val serverOut: OutputStream
-            val serverIn:  InputStream
+            val serverIn: InputStream
 
             if (isHttps) {
                 val ssl = SSLContext.getInstance("TLS")
@@ -221,10 +251,10 @@ class LocalProxyServer @Inject constructor(
                 ) as SSLSocket
                 sslSock.startHandshake()
                 serverOut = sslSock.outputStream
-                serverIn  = sslSock.inputStream
+                serverIn = sslSock.inputStream
             } else {
                 serverOut = serverSocket.outputStream
-                serverIn  = serverSocket.inputStream
+                serverIn = serverSocket.inputStream
             }
 
             val reqBuilder = StringBuilder()
@@ -240,14 +270,14 @@ class LocalProxyServer @Inject constructor(
             serverOut.write(reqBuilder.toString().toByteArray())
             serverOut.flush()
 
-            val serverReader  = serverIn.bufferedReader()
-            val statusLine    = serverReader.readLine()?.trim() ?: return
-            val statusParts   = statusLine.split(" ", limit = 3)
-            val statusCode    = statusParts.getOrNull(1)?.toIntOrNull() ?: 0
+            val serverReader = serverIn.bufferedReader()
+            val statusLine = serverReader.readLine()?.trim() ?: return
+            val statusParts = statusLine.split(" ", limit = 3)
+            val statusCode = statusParts.getOrNull(1)?.toIntOrNull() ?: 0
             val statusMessage = statusParts.getOrNull(2) ?: ""
 
-            val respHeaders      = mutableMapOf<String, String>()
-            var respContentLen   = -1
+            val respHeaders = mutableMapOf<String, String>()
+            var respContentLen = -1
             var transferEncoding = ""
 
             var rLine = serverReader.readLine()
@@ -285,54 +315,56 @@ class LocalProxyServer @Inject constructor(
 
             runCatching { serverSocket.close() }
 
-            val transaction = HttpTransaction(
-                id                = id,
-                timestampMs       = startMs,
-                url               = url,
-                host              = host,
-                path              = path,
-                method            = parseMethod(method),
-                requestHeaders    = reqHeaders,
-                requestBody       = reqBody,
-                requestSizeBytes  = reqBody?.toByteArray()?.size?.toLong() ?: 0L,
-                responseCode      = statusCode,
-                responseMessage   = statusMessage,
-                responseHeaders   = respHeaders,
-                responseBody      = respBody,
-                responseSizeBytes = respBody.toByteArray().size.toLong(),
-                durationMs        = durationMs,
-                protocol          = if (isHttps) "HTTPS" else "HTTP",
-                isReplay          = false,
-                error             = null,
+            transactionEmitter.emit(
+                HttpTransaction(
+                    id = id,
+                    timestampMs = startMs,
+                    url = url,
+                    host = host,
+                    path = path,
+                    method = parseMethod(method),
+                    requestHeaders = reqHeaders,
+                    requestBody = reqBody,
+                    requestSizeBytes = reqBody?.toByteArray()?.size?.toLong() ?: 0L,
+                    responseCode = statusCode,
+                    responseMessage = statusMessage,
+                    responseHeaders = respHeaders,
+                    responseBody = respBody,
+                    responseSizeBytes = respBody.toByteArray().size.toLong(),
+                    durationMs = durationMs,
+                    protocol = if (isHttps) "HTTPS" else "HTTP",
+                    isReplay = false,
+                    error = null,
+                )
             )
 
-            transactionEmitter.emit(transaction)
             Log.d(TAG, "Captured: $method $url → $statusCode (${durationMs}ms)")
 
         } catch (e: Exception) {
             val durationMs = System.currentTimeMillis() - startMs
-            Log.w(TAG, "Forward failed for $host: ${e.message}")
+            Log.e(TAG, "captureAndForward failed for $host:$port — " +
+                    "${e.javaClass.simpleName}: ${e.message}")
 
             transactionEmitter.emit(
                 HttpTransaction(
-                    id                = id,
-                    timestampMs       = startMs,
-                    url               = url,
-                    host              = host,
-                    path              = path,
-                    method            = parseMethod(method),
-                    requestHeaders    = reqHeaders,
-                    requestBody       = reqBody,
-                    requestSizeBytes  = reqBody?.toByteArray()?.size?.toLong() ?: 0L,
-                    responseCode      = null,
-                    responseMessage   = null,
-                    responseHeaders   = emptyMap(),
-                    responseBody      = null,
+                    id = id,
+                    timestampMs = startMs,
+                    url = url,
+                    host = host,
+                    path = path,
+                    method = parseMethod(method),
+                    requestHeaders = reqHeaders,
+                    requestBody = reqBody,
+                    requestSizeBytes = reqBody?.toByteArray()?.size?.toLong() ?: 0L,
+                    responseCode = null,
+                    responseMessage = null,
+                    responseHeaders = emptyMap(),
+                    responseBody = null,
                     responseSizeBytes = 0L,
-                    durationMs        = durationMs,
-                    protocol          = if (isHttps) "HTTPS" else "HTTP",
-                    isReplay          = false,
-                    error             = e.message ?: "Connection failed",
+                    durationMs = durationMs,
+                    protocol = if (isHttps) "HTTPS" else "HTTP",
+                    isReplay = false,
+                    error = e.message ?: "Connection failed",
                 )
             )
 
