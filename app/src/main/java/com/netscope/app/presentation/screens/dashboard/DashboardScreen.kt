@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Security
@@ -65,6 +66,7 @@ fun DashboardScreen(
     onNavigateToTraffic: () -> Unit,
     onNavigateToDns: () -> Unit,
     onNavigateToTimeline: () -> Unit,
+    onNavigateToConnections: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -140,7 +142,7 @@ fun DashboardScreen(
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     QuickNavCard(
                         icon = Icons.Default.List,
@@ -158,6 +160,12 @@ fun DashboardScreen(
                         icon = Icons.Default.Timeline,
                         label = "Timeline",
                         onClick = onNavigateToTimeline,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.Cable,
+                        label = "Connections",
+                        onClick = onNavigateToConnections,
                         modifier = Modifier.weight(1f),
                     )
                 }

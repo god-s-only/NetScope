@@ -8,6 +8,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.netscope.app.presentation.screens.connections.ConnectionsScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
@@ -37,6 +38,7 @@ fun NetScopeNavGraph(
                 onNavigateToTraffic = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
                 onNavigateToDns = { navController.navigate(NavRoutes.DNS) },
                 onNavigateToTimeline = { navController.navigate(NavRoutes.TIMELINE) },
+                onNavigateToConnections = { navController.navigate(NavRoutes.CONNECTIONS) },
                 viewModel = viewModel,
             )
         }
@@ -83,6 +85,12 @@ fun NetScopeNavGraph(
                 onTransactionClick = { id ->
                     navController.navigate(NavRoutes.trafficDetail(id))
                 },
+            )
+        }
+
+        composable(NavRoutes.CONNECTIONS) {
+            ConnectionsScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 
