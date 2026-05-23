@@ -7,6 +7,7 @@ object NavRoutes {
     const val TRAFFIC_DETAIL = "traffic_detail/{${NavArgs.TRANSACTION_ID}}"
     const val DNS = "dns"
     const val TIMELINE = "timeline"
+    const val CONNECTIONS = "connections"
     const val REPLAY = "replay/{${NavArgs.TRANSACTION_ID}}"
 
     fun trafficDetail(id: String) = "traffic_detail/$id"
