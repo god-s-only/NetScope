@@ -29,7 +29,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,7 +39,6 @@ import com.netscope.app.presentation.components.formatDuration
 import com.netscope.app.presentation.theme.NetScopeBackground
 import com.netscope.app.presentation.theme.NetScopeError
 import com.netscope.app.presentation.theme.NetScopeInfo
-import com.netscope.app.presentation.theme.NetScopePrimary
 import com.netscope.app.presentation.theme.NetScopeSurface
 import com.netscope.app.presentation.theme.NetScopeSuccess
 import com.netscope.app.presentation.theme.NetScopeWarning
@@ -50,9 +48,10 @@ import com.netscope.app.presentation.theme.TextTertiary
 
 private const val LANE_HEIGHT_DP = 32
 private const val LANE_GAP_DP = 6
-private const val MS_PER_DP = 8f
 private const val MIN_BAR_WIDTH_DP = 8f
 private const val HORIZONTAL_PADDING_DP = 16f
+
+private const val MAX_CANVAS_WIDTH_DP = 4000f
 
 @Composable
 fun TimelineScreen(
@@ -113,9 +112,19 @@ private fun TimelineContent(
     modifier: Modifier = Modifier,
 ) {
     val laneCount = (state.entries.maxOfOrNull { it.laneIndex } ?: 0) + 1
-    val totalWidthDp = (state.totalDurationMs / MS_PER_DP)
-        .coerceAtLeast(300f) + HORIZONTAL_PADDING_DP * 2
-    val totalHeightDp = laneCount * (LANE_HEIGHT_DP + LANE_GAP_DP).toFloat()
+
+    val msPerDp = if (state.totalDurationMs > 0) {
+        (state.totalDurationMs / (MAX_CANVAS_WIDTH_DP - HORIZONTAL_PADDING_DP * 2))
+            .coerceAtLeast(1f)
+    } else {
+        8f
+    }
+
+    val canvasWidthDp = ((state.totalDurationMs / msPerDp) + HORIZONTAL_PADDING_DP * 2)
+        .coerceIn(300f, MAX_CANVAS_WIDTH_DP)
+
+    val canvasHeightDp = (laneCount * (LANE_HEIGHT_DP + LANE_GAP_DP).toFloat() + 32f)
+        .coerceAtLeast(100f)
 
     Column(modifier = modifier.fillMaxSize()) {
 
@@ -156,49 +165,58 @@ private fun TimelineContent(
             LegendItem(color = Color(0xFF484F58), label = "Unknown")
         }
 
-        // ── Scrollable chart ──────────────────────────────────
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .horizontalScroll(rememberScrollState())
                 .verticalScroll(rememberScrollState()),
         ) {
-            // draw bars on canvas
-            Canvas(
+            Box(
                 modifier = Modifier
-                    .width(totalWidthDp.dp)
-                    .height((totalHeightDp + 32f).dp),
+                    .horizontalScroll(rememberScrollState())
+                    .width(canvasWidthDp.dp)
+                    .height(canvasHeightDp.dp),
             ) {
-                state.entries.forEach { entry ->
-                    val barColor = barColor(entry.transaction.statusCategory)
-                    val x = (entry.startOffsetMs / MS_PER_DP) + HORIZONTAL_PADDING_DP
-                    val y = entry.laneIndex * (LANE_HEIGHT_DP + LANE_GAP_DP).toFloat() + 16f
-                    val w = (entry.durationMs / MS_PER_DP).coerceAtLeast(MIN_BAR_WIDTH_DP)
-                    val h = LANE_HEIGHT_DP.toFloat()
+                // draw bars
+                Canvas(
+                    modifier = Modifier
+                        .width(canvasWidthDp.dp)
+                        .height(canvasHeightDp.dp),
+                ) {
+                    state.entries.forEach { entry ->
+                        val color = barColor(entry.transaction.statusCategory)
+                        val x = (entry.startOffsetMs / msPerDp) + HORIZONTAL_PADDING_DP
+                        val y = entry.laneIndex *
+                                (LANE_HEIGHT_DP + LANE_GAP_DP).toFloat() + 16f
+                        val w = (entry.durationMs / msPerDp)
+                            .coerceAtLeast(MIN_BAR_WIDTH_DP)
+                        val h = LANE_HEIGHT_DP.toFloat()
 
-                    drawRoundRect(
-                        color = barColor.copy(alpha = 0.85f),
-                        topLeft = Offset(x, y),
-                        size = Size(w, h),
-                        cornerRadius = CornerRadius(4f, 4f),
+                        drawRoundRect(
+                            color = color.copy(alpha = 0.85f),
+                            topLeft = Offset(x, y),
+                            size = Size(w, h),
+                            cornerRadius = CornerRadius(4f, 4f),
+                        )
+                    }
+                }
+
+                // clickable overlays
+                state.entries.forEach { entry ->
+                    val x = (entry.startOffsetMs / msPerDp) + HORIZONTAL_PADDING_DP
+                    val y = entry.laneIndex *
+                            (LANE_HEIGHT_DP + LANE_GAP_DP).toFloat() + 16f
+                    val w = (entry.durationMs / msPerDp)
+                        .coerceAtLeast(MIN_BAR_WIDTH_DP)
+
+                    Box(
+                        modifier = Modifier
+                            .offset(x = x.dp, y = y.dp)
+                            .width(w.dp)
+                            .height(LANE_HEIGHT_DP.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onTransactionClick(entry.transaction.id) },
                     )
                 }
-            }
-
-            // transparent clickable overlays on top of each bar
-            state.entries.forEach { entry ->
-                val x = (entry.startOffsetMs / MS_PER_DP) + HORIZONTAL_PADDING_DP
-                val y = entry.laneIndex * (LANE_HEIGHT_DP + LANE_GAP_DP).toFloat() + 16f
-                val w = (entry.durationMs / MS_PER_DP).coerceAtLeast(MIN_BAR_WIDTH_DP)
-
-                Box(
-                    modifier = Modifier
-                        .offset(x = x.dp, y = y.dp)
-                        .width(w.dp)
-                        .height(LANE_HEIGHT_DP.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { onTransactionClick(entry.transaction.id) },
-                )
             }
         }
     }
