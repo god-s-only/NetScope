@@ -1,10 +1,11 @@
-package com.netscope.app.presentation
+package com.netscope.app
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.security.KeyChain
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,7 +32,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            android.util.Log.d("MainActivity", "Notification permission granted")
+            Log.d("MainActivity", "Notification permission granted")
         }
     }
 
