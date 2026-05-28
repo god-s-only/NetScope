@@ -141,7 +141,6 @@ fun DashboardScreen(
 
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     QuickNavCard(
@@ -156,6 +155,10 @@ fun DashboardScreen(
                         onClick = onNavigateToDns,
                         modifier = Modifier.weight(1f),
                     )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     QuickNavCard(
                         icon = Icons.Default.Timeline,
                         label = "Timeline",
