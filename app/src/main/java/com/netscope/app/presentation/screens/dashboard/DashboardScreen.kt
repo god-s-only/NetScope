@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.List
@@ -67,6 +68,7 @@ fun DashboardScreen(
     onNavigateToDns: () -> Unit,
     onNavigateToTimeline: () -> Unit,
     onNavigateToConnections: () -> Unit,
+    onNavigateToStats: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -140,37 +142,52 @@ fun DashboardScreen(
             }
 
             item {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    QuickNavCard(
-                        icon = Icons.Default.List,
-                        label = "HTTP",
-                        onClick = onNavigateToTraffic,
-                        modifier = Modifier.weight(1f),
-                    )
-                    QuickNavCard(
-                        icon = Icons.Default.Dns,
-                        label = "DNS",
-                        onClick = onNavigateToDns,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickNavCard(
-                        icon = Icons.Default.Timeline,
-                        label = "Timeline",
-                        onClick = onNavigateToTimeline,
-                        modifier = Modifier.weight(1f),
-                    )
-                    QuickNavCard(
-                        icon = Icons.Default.Cable,
-                        label = "Connections",
-                        onClick = onNavigateToConnections,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        QuickNavCard(
+                            icon = Icons.Default.List,
+                            label = "HTTP",
+                            onClick = onNavigateToTraffic,
+                            modifier = Modifier.weight(1f),
+                        )
+                        QuickNavCard(
+                            icon = Icons.Default.Dns,
+                            label = "DNS",
+                            onClick = onNavigateToDns,
+                            modifier = Modifier.weight(1f),
+                        )
+                        QuickNavCard(
+                            icon = Icons.Default.Timeline,
+                            label = "Timeline",
+                            onClick = onNavigateToTimeline,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        QuickNavCard(
+                            icon = Icons.Default.Cable,
+                            label = "Connections",
+                            onClick = onNavigateToConnections,
+                            modifier = Modifier.weight(1f),
+                        )
+                        QuickNavCard(
+                            icon = Icons.Default.BarChart,
+                            label = "Stats",
+                            onClick = onNavigateToStats,
+                            modifier = Modifier.weight(1f),
+                        )
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
 
