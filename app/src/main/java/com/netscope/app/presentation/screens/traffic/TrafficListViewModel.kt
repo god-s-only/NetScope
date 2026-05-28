@@ -1,12 +1,16 @@
 package com.netscope.app.presentation.screens.traffic
 
 import androidx.lifecycle.viewModelScope
+import com.netscope.app.data.export.ExportManager
 import com.netscope.app.domain.model.HttpMethod
+import com.netscope.app.domain.model.HttpTransaction
 import com.netscope.app.domain.model.StatusCategory
 import com.netscope.app.domain.model.TrafficFilter
 import com.netscope.app.domain.usecase.ClearAllTrafficUseCase
+import com.netscope.app.domain.usecase.ExportTrafficUseCase
 import com.netscope.app.domain.usecase.ObserveHttpTransactionsUseCase
 import com.netscope.app.presentation.base.BaseViewModel
+import android.content.Intent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -25,6 +29,8 @@ import javax.inject.Inject
 class TrafficListViewModel @Inject constructor(
     private val observeHttpTransactionsUseCase: ObserveHttpTransactionsUseCase,
     private val clearAllTrafficUseCase: ClearAllTrafficUseCase,
+    private val exportTrafficUseCase: ExportTrafficUseCase,
+    private val exportManager: ExportManager,
 ) : BaseViewModel<TrafficListUiState>(TrafficListUiState()) {
 
     private val filterFlow = MutableStateFlow(TrafficFilter())
@@ -54,7 +60,6 @@ class TrafficListViewModel @Inject constructor(
             .catch { e -> updateState { copy(error = e.message, isLoading = false) } }
             .launchIn(viewModelScope)
     }
-
 
     fun onSearchQueryChanged(query: String) {
         filterFlow.value = filterFlow.value.copy(searchQuery = query)
@@ -99,6 +104,37 @@ class TrafficListViewModel @Inject constructor(
             clearAllTrafficUseCase()
         }
     }
+
+    fun exportTraffic() {
+        viewModelScope.launch {
+            updateState { copy(isExporting = true, error = null) }
+            when (val result = exportTrafficUseCase()) {
+                is ExportTrafficUseCase.ExportResult.Success -> {
+                    val intent = exportManager.saveAndShare(
+                        json = result.json,
+                        fileName = result.fileName,
+                    )
+                    updateState {
+                        copy(
+                            isExporting = false,
+                            exportIntent = intent,
+                        )
+                    }
+                }
+                is ExportTrafficUseCase.ExportResult.Failure -> {
+                    updateState {
+                        copy(
+                            isExporting = false,
+                            error = result.error,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun onExportIntentConsumed() =
+        updateState { copy(exportIntent = null) }
 
     fun dismissError() = updateState { copy(error = null) }
 }
