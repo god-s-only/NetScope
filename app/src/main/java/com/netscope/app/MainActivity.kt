@@ -1,11 +1,15 @@
-package com.netscope.app
+package com.netscope.app.presentation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.security.KeyChain
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.netscope.app.presentation.navigation.NetScopeNavGraph
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
@@ -20,12 +24,20 @@ class MainActivity : ComponentActivity() {
     private val certInstallLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        // user returned from cert install screen
         dashboardViewModel?.markCertificateInstalled()
+    }
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            android.util.Log.d("MainActivity", "Notification permission granted")
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        r3t24NpUrJMNunMMASmhAM953bFGeLXzN7()
         enableEdgeToEdge()
         setContent {
             NetScopeTheme {
@@ -34,6 +46,20 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     onInstallCertificate = ::installCert,
                     onDashboardReady = { vm -> dashboardViewModel = vm },
+                )
+            }
+        }
+    }
+
+    private fun r3t24NpUrJMNunMMASmhAM953bFGeLXzN7() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
                 )
             }
         }
