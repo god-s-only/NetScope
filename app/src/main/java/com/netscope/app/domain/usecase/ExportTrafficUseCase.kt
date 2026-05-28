@@ -1,39 +1,64 @@
 package com.netscope.app.domain.usecase
 
-import com.google.gson.GsonBuilder
+import android.util.Log
 import com.netscope.app.domain.model.HttpTransaction
 import com.netscope.app.domain.repository.TrafficRepository
+import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
+
+private const val TAG = "ExportTrafficUseCase"
 
 class ExportTrafficUseCase @Inject constructor(
     private val trafficRepository: TrafficRepository,
 ) {
     sealed class ExportResult {
-        data class Success(val json: String, val fileName: String) : ExportResult()
+        data class Success(
+            val json: String,
+            val fileName: String,
+        ) : ExportResult()
         data class Failure(val error: String) : ExportResult()
     }
 
     suspend operator fun invoke(): ExportResult = withContext(Dispatchers.IO) {
         try {
             val transactions = trafficRepository.observeHttpTransactions().first()
+
+            if (transactions.isEmpty()) {
+                return@withContext ExportResult.Failure("No traffic to export")
+            }
+
             val har = buildHar(transactions)
             val gson = GsonBuilder().setPrettyPrinting().create()
-            ExportResult.Success(
-                json = gson.toJson(har),
-                fileName = "netscope_export_${System.currentTimeMillis()}.har",
-            )
+            val json = gson.toJson(har)
+            val fileName = "netscope_${System.currentTimeMillis()}.har"
+
+            Log.d(TAG, "Exported ${transactions.size} transactions to $fileName")
+            ExportResult.Success(json = json, fileName = fileName)
+
         } catch (e: Exception) {
+            Log.e(TAG, "Export failed: ${e.message}")
             ExportResult.Failure(e.message ?: "Export failed")
         }
     }
 
     private fun buildHar(transactions: List<HttpTransaction>): Map<String, Any> {
+        val isoFormat = SimpleDateFormat(
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            Locale.getDefault(),
+        ).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+
         val entries = transactions.map { tx ->
             mapOf(
-                "startedDateTime" to java.util.Date(tx.timestampMs).toString(),
+                "startedDateTime" to isoFormat.format(Date(tx.timestampMs)),
                 "time" to tx.durationMs,
                 "request" to mapOf(
                     "method" to tx.method.name,
@@ -59,7 +84,8 @@ class ExportTrafficUseCase @Inject constructor(
                     },
                     "content" to mapOf(
                         "size" to tx.responseSizeBytes,
-                        "mimeType" to (tx.responseHeaders["Content-Type"] ?: ""),
+                        "mimeType" to
+                                (tx.responseHeaders["Content-Type"] ?: "text/plain"),
                         "text" to (tx.responseBody ?: ""),
                     ),
                     "redirectURL" to "",
@@ -71,6 +97,7 @@ class ExportTrafficUseCase @Inject constructor(
                     "wait" to tx.durationMs,
                     "receive" to 0,
                 ),
+                "cache" to emptyMap<String, Any>(),
             )
         }
 
