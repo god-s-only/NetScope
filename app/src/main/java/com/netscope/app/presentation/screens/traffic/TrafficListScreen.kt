@@ -1,30 +1,67 @@
 package com.netscope.app.presentation.screens.traffic
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.FilterAltOff
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.netscope.app.domain.model.HttpMethod
 import com.netscope.app.domain.model.HttpTransaction
-import com.netscope.app.domain.model.StatusCategory
-import com.netscope.app.domain.model.TrafficFilter
-import com.netscope.app.presentation.components.*
-import com.netscope.app.presentation.screens.traffic.TrafficListViewModel
-import com.netscope.app.presentation.theme.*
+import com.netscope.app.presentation.components.EmptyState
+import com.netscope.app.presentation.components.MethodChip
+import com.netscope.app.presentation.components.NetScopeTopBar
+import com.netscope.app.presentation.components.StatusChip
+import com.netscope.app.presentation.components.formatDuration
+import com.netscope.app.presentation.theme.NetScopeBackground
+import com.netscope.app.presentation.theme.NetScopePrimary
+import com.netscope.app.presentation.theme.NetScopeSurface
+import com.netscope.app.presentation.theme.NetScopeWarning
+import com.netscope.app.presentation.theme.TextPrimary
+import com.netscope.app.presentation.theme.TextSecondary
+import com.netscope.app.presentation.theme.TextTertiary
 
 @Composable
 fun TrafficListScreen(
@@ -33,7 +70,18 @@ fun TrafficListScreen(
     viewModel: TrafficListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var showFilterSheet by remember { mutableStateOf(false) }
+
+    // launch share intent when export completes
+    LaunchedEffect(state.exportIntent) {
+        state.exportIntent?.let { intent ->
+            context.startActivity(
+                Intent.createChooser(intent, "Share HAR file")
+            )
+            viewModel.onExportIntentConsumed()
+        }
+    }
 
     Scaffold(
         containerColor = NetScopeBackground,
@@ -58,6 +106,25 @@ fun TrafficListScreen(
                             tint = TextSecondary,
                         )
                     }
+                    // export button
+                    IconButton(
+                        onClick = viewModel::exportTraffic,
+                        enabled = !state.isExporting,
+                    ) {
+                        if (state.isExporting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = NetScopePrimary,
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = "Export HAR",
+                                tint = TextSecondary,
+                            )
+                        }
+                    }
                     IconButton(onClick = { viewModel.clearAllTraffic() }) {
                         Icon(
                             Icons.Default.DeleteSweep,
@@ -74,6 +141,8 @@ fun TrafficListScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+
+            // ── Search ────────────────────────────────────────
             OutlinedTextField(
                 value = state.filter.searchQuery,
                 onValueChange = viewModel::onSearchQueryChanged,
@@ -84,12 +153,14 @@ fun TrafficListScreen(
                     Text("Search URL, host, body…", color = TextTertiary)
                 },
                 leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = TextTertiary)
+                    Icon(Icons.Default.Search, null, tint = TextTertiary)
                 },
                 trailingIcon = {
                     if (state.filter.searchQuery.isNotBlank()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextTertiary)
+                        IconButton(
+                            onClick = { viewModel.onSearchQueryChanged("") }
+                        ) {
+                            Icon(Icons.Default.Clear, null, tint = TextTertiary)
                         }
                     }
                 },
@@ -103,6 +174,7 @@ fun TrafficListScreen(
                 ),
             )
 
+            // ── Active filter chips ───────────────────────────
             if (state.filter.isActive) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -112,7 +184,7 @@ fun TrafficListScreen(
                         item {
                             FilterChip(
                                 selected = true,
-                                onClick = { viewModel.onShowSlowOnlyToggled() },
+                                onClick = viewModel::onShowSlowOnlyToggled,
                                 label = { Text("Slow > 2s") },
                             )
                         }
@@ -121,7 +193,7 @@ fun TrafficListScreen(
                         item {
                             FilterChip(
                                 selected = true,
-                                onClick = { viewModel.onShowErrorsOnlyToggled() },
+                                onClick = viewModel::onShowErrorsOnlyToggled,
                                 label = { Text("Errors only") },
                             )
                         }
@@ -134,9 +206,9 @@ fun TrafficListScreen(
                         )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
             }
 
+            // ── Count ─────────────────────────────────────────
             Text(
                 text = "${state.filteredCount} requests",
                 style = MaterialTheme.typography.bodySmall,
@@ -144,10 +216,21 @@ fun TrafficListScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
 
+            // ── Error ─────────────────────────────────────────
+            state.error?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = com.netscope.app.presentation.theme.NetScopeError,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+
+            // ── List ──────────────────────────────────────────
             if (state.transactions.isEmpty()) {
                 EmptyState(
                     title = "No requests captured",
-                    subtitle = "Start VPN capture to see HTTP traffic",
+                    subtitle = "Start the proxy and browse any site",
                 )
             } else {
                 LazyColumn(
@@ -157,31 +240,6 @@ fun TrafficListScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(NetScopeInfo.copy(alpha = 0.10f))
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector        = Icons.Default.Info,
-                                contentDescription = null,
-                                tint               = NetScopeInfo,
-                                modifier           = Modifier.size(18.dp),
-                            )
-                            Text(
-                                text  = "HTTP capture requires the NetScopeInterceptor " +
-                                        "embedded in the target app. VPN mode captures " +
-                                        "packet metadata only — not encrypted HTTPS bodies.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary,
-                            )
-                        }
-                    }
                     items(
                         items = state.transactions,
                         key = { it.id },
@@ -239,11 +297,11 @@ private fun TransactionRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            transaction.appInfo?.let {
+            if (transaction.isReplay) {
                 Text(
-                    text = it.appName,
+                    text = "REPLAY",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary,
+                    color = NetScopePrimary,
                 )
             }
         }
@@ -253,7 +311,6 @@ private fun TransactionRow(
                 code = transaction.responseCode,
                 category = transaction.statusCategory,
             )
-            Spacer(Modifier.height(4.dp))
             Text(
                 text = formatDuration(transaction.durationMs),
                 style = MaterialTheme.typography.bodySmall,
@@ -266,7 +323,7 @@ private fun TransactionRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterBottomSheet(
-    currentFilter: TrafficFilter,
+    currentFilter: com.netscope.app.domain.model.TrafficFilter,
     onMethodToggled: (HttpMethod) -> Unit,
     onSlowToggled: () -> Unit,
     onErrorsToggled: () -> Unit,
@@ -280,18 +337,23 @@ private fun FilterBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 "Filter",
                 style = MaterialTheme.typography.titleLarge,
                 color = TextPrimary,
             )
-            Spacer(Modifier.height(16.dp))
 
-            Text("Method", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            Spacer(Modifier.height(8.dp))
+            Text(
+                "Method",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(HttpMethod.entries.filter { it != HttpMethod.UNKNOWN }) { method ->
+                items(
+                    HttpMethod.entries.filter { it != HttpMethod.UNKNOWN }
+                ) { method ->
                     FilterChip(
                         selected = method in currentFilter.methods,
                         onClick = { onMethodToggled(method) },
@@ -300,14 +362,12 @@ private fun FilterBottomSheet(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-            Text("Other", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            Text(
+                "Other",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = currentFilter.showSlowOnly,
                     onClick = onSlowToggled,
@@ -319,7 +379,6 @@ private fun FilterBottomSheet(
                     label = { Text("Errors only") },
                 )
             }
-            Spacer(Modifier.height(32.dp))
         }
     }
 }
