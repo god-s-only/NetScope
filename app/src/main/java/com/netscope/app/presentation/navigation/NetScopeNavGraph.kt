@@ -42,6 +42,7 @@ fun NetScopeNavGraph(
                 onNavigateToTimeline = { navController.navigate(NavRoutes.TIMELINE) },
                 onNavigateToConnections = { navController.navigate(NavRoutes.CONNECTIONS) },
                 onNavigateToStats = { navController.navigate(NavRoutes.STATS) },
+                onNavigateToSettings = { navController.navigate(NavRoutes.SETTINGS) },
                 viewModel = viewModel,
             )
         }

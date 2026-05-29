@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -69,8 +70,10 @@ fun DashboardScreen(
     onNavigateToTimeline: () -> Unit,
     onNavigateToConnections: () -> Unit,
     onNavigateToStats: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
-) {
+)
+{
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -79,10 +82,10 @@ fun DashboardScreen(
             NetScopeTopBar(
                 title = "NetScope",
                 actions = {
-                    androidx.compose.material3.IconButton(onClick = onNavigateToSetup) {
+                    IconButton(onClick = onNavigateToSettings) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = "Setup",
+                            contentDescription = "Settings",
                             tint = TextSecondary,
                         )
                     }
