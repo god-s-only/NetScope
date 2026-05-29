@@ -9,6 +9,7 @@ object NavRoutes {
     const val TIMELINE = "timeline"
     const val CONNECTIONS = "connections"
     const val STATS = "stats"
+    const val SETTINGS = "settings"
     const val REPLAY = "replay/{${NavArgs.TRANSACTION_ID}}"
 
     fun trafficDetail(id: String) = "traffic_detail/$id"
