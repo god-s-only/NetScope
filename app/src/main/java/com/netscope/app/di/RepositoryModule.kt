@@ -3,10 +3,12 @@ package com.netscope.app.di
 import com.netscope.app.data.repository.BandwidthRepositoryImpl
 import com.netscope.app.data.repository.ConnectionRepositoryImpl
 import com.netscope.app.data.repository.DnsRepositoryImpl
+import com.netscope.app.data.repository.SettingsRepositoryImpl
 import com.netscope.app.data.repository.TrafficRepositoryImpl
 import com.netscope.app.domain.repository.BandwidthRepository
 import com.netscope.app.domain.repository.ConnectionRepository
 import com.netscope.app.domain.repository.DnsRepository
+import com.netscope.app.domain.repository.SettingsRepository
 import com.netscope.app.domain.repository.TrafficRepository
 import dagger.Binds
 import dagger.Module
@@ -41,4 +43,10 @@ abstract class RepositoryModule {
     abstract fun bindBandwidthRepository(
         impl: BandwidthRepositoryImpl,
     ): BandwidthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSettingsRepository(
+        impl: SettingsRepositoryImpl,
+    ): SettingsRepository
 }
