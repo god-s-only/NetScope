@@ -1,5 +1,6 @@
 package com.netscope.app.presentation.screens.traffic
 
+import android.content.Intent
 import androidx.lifecycle.viewModelScope
 import com.netscope.app.data.export.ExportManager
 import com.netscope.app.domain.model.HttpMethod
@@ -10,7 +11,6 @@ import com.netscope.app.domain.usecase.ClearAllTrafficUseCase
 import com.netscope.app.domain.usecase.ExportTrafficUseCase
 import com.netscope.app.domain.usecase.ObserveHttpTransactionsUseCase
 import com.netscope.app.presentation.base.BaseViewModel
-import android.content.Intent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -61,6 +61,8 @@ class TrafficListViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
+    // ── Filter actions ────────────────────────────────────────
+
     fun onSearchQueryChanged(query: String) {
         filterFlow.value = filterFlow.value.copy(searchQuery = query)
         updateState { copy(filter = filterFlow.value) }
@@ -73,7 +75,7 @@ class TrafficListViewModel @Inject constructor(
         updateState { copy(filter = filterFlow.value) }
     }
 
-    fun onStatusFilterToggled(category: StatusCategory) {
+    fun onStatusCategoryToggled(category: StatusCategory) {
         val current = filterFlow.value.statusCategories.toMutableSet()
         if (category in current) current.remove(category) else current.add(category)
         filterFlow.value = filterFlow.value.copy(statusCategories = current)
@@ -82,15 +84,20 @@ class TrafficListViewModel @Inject constructor(
 
     fun onShowSlowOnlyToggled() {
         filterFlow.value = filterFlow.value.copy(
-            showSlowOnly = !filterFlow.value.showSlowOnly
+            showSlowOnly = !filterFlow.value.showSlowOnly,
         )
         updateState { copy(filter = filterFlow.value) }
     }
 
     fun onShowErrorsOnlyToggled() {
         filterFlow.value = filterFlow.value.copy(
-            showErrorsOnly = !filterFlow.value.showErrorsOnly
+            showErrorsOnly = !filterFlow.value.showErrorsOnly,
         )
+        updateState { copy(filter = filterFlow.value) }
+    }
+
+    fun onMinDurationChanged(ms: Long?) {
+        filterFlow.value = filterFlow.value.copy(minDurationMs = ms)
         updateState { copy(filter = filterFlow.value) }
     }
 
@@ -98,6 +105,8 @@ class TrafficListViewModel @Inject constructor(
         filterFlow.value = TrafficFilter()
         updateState { copy(filter = TrafficFilter()) }
     }
+
+    // ── Other actions ─────────────────────────────────────────
 
     fun clearAllTraffic() {
         viewModelScope.launch {
@@ -115,26 +124,19 @@ class TrafficListViewModel @Inject constructor(
                         fileName = result.fileName,
                     )
                     updateState {
-                        copy(
-                            isExporting = false,
-                            exportIntent = intent,
-                        )
+                        copy(isExporting = false, exportIntent = intent)
                     }
                 }
                 is ExportTrafficUseCase.ExportResult.Failure -> {
                     updateState {
-                        copy(
-                            isExporting = false,
-                            error = result.error,
-                        )
+                        copy(isExporting = false, error = result.error)
                     }
                 }
             }
         }
     }
 
-    fun onExportIntentConsumed() =
-        updateState { copy(exportIntent = null) }
+    fun onExportIntentConsumed() = updateState { copy(exportIntent = null) }
 
     fun dismissError() = updateState { copy(error = null) }
 }
