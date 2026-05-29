@@ -7,8 +7,12 @@ import javax.inject.Inject
 
 class ClearAllTrafficUseCase @Inject constructor(
     private val trafficRepository: TrafficRepository,
+    private val dnsRepository: DnsRepository,
+    private val connectionRepository: ConnectionRepository,
 ) {
     suspend operator fun invoke() {
         trafficRepository.clearAll()
+        dnsRepository.clearAll()
+        connectionRepository.clearAll()
     }
 }
