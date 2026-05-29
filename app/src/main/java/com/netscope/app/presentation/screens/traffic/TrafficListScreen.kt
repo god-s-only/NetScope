@@ -18,14 +18,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,12 +53,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.netscope.app.domain.model.HttpMethod
 import com.netscope.app.domain.model.HttpTransaction
+import com.netscope.app.domain.model.StatusCategory
+import com.netscope.app.domain.model.TrafficFilter
 import com.netscope.app.presentation.components.EmptyState
 import com.netscope.app.presentation.components.MethodChip
 import com.netscope.app.presentation.components.NetScopeTopBar
 import com.netscope.app.presentation.components.StatusChip
 import com.netscope.app.presentation.components.formatDuration
 import com.netscope.app.presentation.theme.NetScopeBackground
+import com.netscope.app.presentation.theme.NetScopeError
 import com.netscope.app.presentation.theme.NetScopePrimary
 import com.netscope.app.presentation.theme.NetScopeSurface
 import com.netscope.app.presentation.theme.NetScopeWarning
@@ -73,12 +79,9 @@ fun TrafficListScreen(
     val context = LocalContext.current
     var showFilterSheet by remember { mutableStateOf(false) }
 
-    // launch share intent when export completes
     LaunchedEffect(state.exportIntent) {
         state.exportIntent?.let { intent ->
-            context.startActivity(
-                Intent.createChooser(intent, "Share HAR file")
-            )
+            context.startActivity(Intent.createChooser(intent, "Share HAR file"))
             viewModel.onExportIntentConsumed()
         }
     }
@@ -90,23 +93,28 @@ fun TrafficListScreen(
                 title = "HTTP Traffic",
                 onNavigateBack = onNavigateBack,
                 actions = {
-                    if (state.filter.isActive) {
-                        IconButton(onClick = { viewModel.clearFilters() }) {
+                    // filter icon with badge showing active filter count
+                    IconButton(onClick = { showFilterSheet = true }) {
+                        BadgedBox(
+                            badge = {
+                                if (state.filter.activeFilterCount > 0) {
+                                    Badge {
+                                        Text(
+                                            state.filter.activeFilterCount.toString()
+                                        )
+                                    }
+                                }
+                            }
+                        ) {
                             Icon(
-                                Icons.Default.FilterAltOff,
-                                contentDescription = "Clear filters",
-                                tint = NetScopePrimary,
+                                Icons.Default.FilterList,
+                                contentDescription = "Filter",
+                                tint = if (state.filter.isActive)
+                                    NetScopePrimary else TextSecondary,
                             )
                         }
                     }
-                    IconButton(onClick = { showFilterSheet = true }) {
-                        Icon(
-                            Icons.Default.FilterList,
-                            contentDescription = "Filter",
-                            tint = TextSecondary,
-                        )
-                    }
-                    // export button
+
                     IconButton(
                         onClick = viewModel::exportTraffic,
                         enabled = !state.isExporting,
@@ -125,7 +133,8 @@ fun TrafficListScreen(
                             )
                         }
                     }
-                    IconButton(onClick = { viewModel.clearAllTraffic() }) {
+
+                    IconButton(onClick = viewModel::clearAllTraffic) {
                         Icon(
                             Icons.Default.DeleteSweep,
                             contentDescription = "Clear all",
@@ -177,32 +186,51 @@ fun TrafficListScreen(
             // ── Active filter chips ───────────────────────────
             if (state.filter.isActive) {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     if (state.filter.showSlowOnly) {
                         item {
-                            FilterChip(
-                                selected = true,
-                                onClick = viewModel::onShowSlowOnlyToggled,
-                                label = { Text("Slow > 2s") },
+                            ActiveFilterChip(
+                                label = "Slow > 2s",
+                                onRemove = viewModel::onShowSlowOnlyToggled,
                             )
                         }
                     }
                     if (state.filter.showErrorsOnly) {
                         item {
-                            FilterChip(
-                                selected = true,
-                                onClick = viewModel::onShowErrorsOnlyToggled,
-                                label = { Text("Errors only") },
+                            ActiveFilterChip(
+                                label = "Errors only",
+                                onRemove = viewModel::onShowErrorsOnlyToggled,
+                            )
+                        }
+                    }
+                    if (state.filter.minDurationMs != null) {
+                        item {
+                            ActiveFilterChip(
+                                label = "> ${state.filter.minDurationMs}ms",
+                                onRemove = { viewModel.onMinDurationChanged(null) },
                             )
                         }
                     }
                     items(state.filter.methods.toList()) { method ->
+                        ActiveFilterChip(
+                            label = method.name,
+                            onRemove = { viewModel.onMethodFilterToggled(method) },
+                        )
+                    }
+                    items(state.filter.statusCategories.toList()) { category ->
+                        ActiveFilterChip(
+                            label = categoryLabel(category),
+                            onRemove = { viewModel.onStatusCategoryToggled(category) },
+                        )
+                    }
+                    // clear all chip
+                    item {
                         FilterChip(
-                            selected = true,
-                            onClick = { viewModel.onMethodFilterToggled(method) },
-                            label = { Text(method.name) },
+                            selected = false,
+                            onClick = viewModel::clearFilters,
+                            label = { Text("Clear all", color = NetScopeError) },
                         )
                     }
                 }
@@ -221,7 +249,7 @@ fun TrafficListScreen(
                 Text(
                     text = error,
                     style = MaterialTheme.typography.bodySmall,
-                    color = com.netscope.app.presentation.theme.NetScopeError,
+                    color = NetScopeError,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
@@ -258,11 +286,37 @@ fun TrafficListScreen(
         FilterBottomSheet(
             currentFilter = state.filter,
             onMethodToggled = viewModel::onMethodFilterToggled,
+            onStatusCategoryToggled = viewModel::onStatusCategoryToggled,
             onSlowToggled = viewModel::onShowSlowOnlyToggled,
             onErrorsToggled = viewModel::onShowErrorsOnlyToggled,
+            onMinDurationChanged = viewModel::onMinDurationChanged,
+            onClearAll = viewModel::clearFilters,
             onDismiss = { showFilterSheet = false },
         )
     }
+}
+
+// ── Sub-composables ───────────────────────────────────────────────────────────
+
+@Composable
+private fun ActiveFilterChip(label: String, onRemove: () -> Unit) {
+    FilterChip(
+        selected = true,
+        onClick = onRemove,
+        label = { Text(label) },
+        trailingIcon = {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Remove filter",
+                modifier = Modifier.size(14.dp),
+            )
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = NetScopePrimary.copy(alpha = 0.20f),
+            selectedLabelColor = NetScopePrimary,
+            selectedTrailingIconColor = NetScopePrimary,
+        ),
+    )
 }
 
 @Composable
@@ -323,10 +377,13 @@ private fun TransactionRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterBottomSheet(
-    currentFilter: com.netscope.app.domain.model.TrafficFilter,
+    currentFilter: TrafficFilter,
     onMethodToggled: (HttpMethod) -> Unit,
+    onStatusCategoryToggled: (StatusCategory) -> Unit,
     onSlowToggled: () -> Unit,
     onErrorsToggled: () -> Unit,
+    onMinDurationChanged: (Long?) -> Unit,
+    onClearAll: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -336,49 +393,123 @@ private fun FilterBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                "Filter",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Filter",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary,
+                )
+                if (currentFilter.isActive) {
+                    androidx.compose.material3.TextButton(
+                        onClick = onClearAll
+                    ) {
+                        Text("Clear all", color = NetScopeError)
+                    }
+                }
+            }
 
-            Text(
-                "Method",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(
-                    HttpMethod.entries.filter { it != HttpMethod.UNKNOWN }
-                ) { method ->
+            // ── Method ────────────────────────────────────────
+            FilterSection(title = "Method") {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(
+                        HttpMethod.entries.filter { it != HttpMethod.UNKNOWN }
+                    ) { method ->
+                        FilterChip(
+                            selected = method in currentFilter.methods,
+                            onClick = { onMethodToggled(method) },
+                            label = { Text(method.name) },
+                        )
+                    }
+                }
+            }
+
+            // ── Status ────────────────────────────────────────
+            FilterSection(title = "Status") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        StatusCategory.SUCCESS to "2xx",
+                        StatusCategory.REDIRECT to "3xx",
+                        StatusCategory.CLIENT_ERROR to "4xx",
+                        StatusCategory.SERVER_ERROR to "5xx",
+                    ).forEach { (category, label) ->
+                        FilterChip(
+                            selected = category in currentFilter.statusCategories,
+                            onClick = { onStatusCategoryToggled(category) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+
+            // ── Timing ────────────────────────────────────────
+            FilterSection(title = "Timing") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
-                        selected = method in currentFilter.methods,
-                        onClick = { onMethodToggled(method) },
-                        label = { Text(method.name) },
+                        selected = currentFilter.showSlowOnly,
+                        onClick = onSlowToggled,
+                        label = { Text("Slow > 2s") },
+                    )
+                    FilterChip(
+                        selected = currentFilter.minDurationMs == 1000L,
+                        onClick = {
+                            onMinDurationChanged(
+                                if (currentFilter.minDurationMs == 1000L) null else 1000L
+                            )
+                        },
+                        label = { Text("> 1s") },
+                    )
+                    FilterChip(
+                        selected = currentFilter.minDurationMs == 500L,
+                        onClick = {
+                            onMinDurationChanged(
+                                if (currentFilter.minDurationMs == 500L) null else 500L
+                            )
+                        },
+                        label = { Text("> 500ms") },
                     )
                 }
             }
 
-            Text(
-                "Other",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = currentFilter.showSlowOnly,
-                    onClick = onSlowToggled,
-                    label = { Text("Slow > 2s") },
-                )
-                FilterChip(
-                    selected = currentFilter.showErrorsOnly,
-                    onClick = onErrorsToggled,
-                    label = { Text("Errors only") },
-                )
+            // ── Other ─────────────────────────────────────────
+            FilterSection(title = "Other") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = currentFilter.showErrorsOnly,
+                        onClick = onErrorsToggled,
+                        label = { Text("Errors only") },
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun FilterSection(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+        content()
+    }
+}
+
+private fun categoryLabel(category: StatusCategory): String = when (category) {
+    StatusCategory.SUCCESS -> "2xx"
+    StatusCategory.REDIRECT -> "3xx"
+    StatusCategory.CLIENT_ERROR -> "4xx"
+    StatusCategory.SERVER_ERROR -> "5xx"
+    else -> category.name
 }
