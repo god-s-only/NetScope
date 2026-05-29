@@ -14,6 +14,7 @@ import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
 import com.netscope.app.presentation.screens.dns.DnsScreen
 import com.netscope.app.presentation.screens.replay.ReplayScreen
+import com.netscope.app.presentation.screens.settings.SettingsScreen
 import com.netscope.app.presentation.screens.setup.ProxySetupScreen
 import com.netscope.app.presentation.screens.stats.StatsScreen
 import com.netscope.app.presentation.screens.timeline.TimelineScreen
@@ -106,6 +107,12 @@ fun NetScopeNavGraph(
         }
         composable(NavRoutes.STATS) {
             StatsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(NavRoutes.SETTINGS) {
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
+            )
         }
     }
 }
