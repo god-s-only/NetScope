@@ -13,11 +13,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,6 +66,15 @@ fun ConnectionsScreen(
             NetScopeTopBar(
                 title = "Connections (${state.allConnections.size})",
                 onNavigateBack = onNavigateBack,
+                actions = {
+                    IconButton(onClick = viewModel::onClearTapped) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = "Clear connections",
+                            tint = TextSecondary,
+                        )
+                    }
+                },
             )
         },
     ) { padding ->
@@ -66,8 +83,6 @@ fun ConnectionsScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-
-            // ── Tab row ───────────────────────────────────────
             TabRow(
                 selectedTabIndex = state.selectedTab.ordinal,
                 containerColor = NetScopeSurface,
@@ -93,7 +108,6 @@ fun ConnectionsScreen(
                 }
             }
 
-            // ── List ──────────────────────────────────────────
             if (displayList.isEmpty()) {
                 EmptyState(
                     title = "No connections",
@@ -119,6 +133,35 @@ fun ConnectionsScreen(
                 }
             }
         }
+    }
+
+    if (state.showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::onClearDismissed,
+            containerColor = NetScopeSurface,
+            title = { Text("Clear connections?", color = TextPrimary) },
+            text = {
+                Text(
+                    "All connection entries will be permanently deleted.",
+                    color = TextSecondary,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = viewModel::onClearConfirmed,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NetScopeError,
+                    ),
+                ) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::onClearDismissed) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+        )
     }
 }
 
@@ -150,7 +193,6 @@ private fun ConnectionRow(connection: ConnectionEntry) {
                     }
                 ),
         )
-
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = connection.displayHost,
@@ -171,7 +213,6 @@ private fun ConnectionRow(connection: ConnectionEntry) {
                 )
             }
         }
-
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = "↑ ${formatBytes(connection.totalBytesSent)}",
