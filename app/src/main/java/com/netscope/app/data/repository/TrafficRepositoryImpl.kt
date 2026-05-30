@@ -1,41 +1,63 @@
 package com.netscope.app.data.repository
 
+import android.util.Log
 import com.netscope.app.data.local.dao.HttpTransactionDao
+import com.netscope.app.data.local.mapper.toDomain
+import com.netscope.app.data.local.mapper.toEntity
 import com.netscope.app.data.mappers.toDomain
 import com.netscope.app.data.mappers.toEntity
 import com.netscope.app.data.proxy.HttpTransactionEmitter
 import com.netscope.app.domain.model.HttpTransaction
 import com.netscope.app.domain.model.PacketInfo
+import com.netscope.app.domain.repository.SettingsRepository
 import com.netscope.app.domain.repository.TrafficRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "TrafficRepositoryImpl"
 
 @Singleton
 class TrafficRepositoryImpl @Inject constructor(
     private val httpTransactionDao: HttpTransactionDao,
     private val httpTransactionEmitter: HttpTransactionEmitter,
+    private val settingsRepository: SettingsRepository,
 ) : TrafficRepository {
 
     private val repoScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
-        Timber.d("TrafficRepositoryImpl: init — starting collector")
+        Log.d(TAG, "init — starting collector")
         repoScope.launch {
             httpTransactionEmitter.transactions.collect { transaction ->
-                Timber.d(
-                    "TrafficRepositoryImpl: saving " +
-                            "${transaction.method} ${transaction.url} → ${transaction.responseCode}"
-                )
+                Log.d(TAG, "saving ${transaction.method} ${transaction.url}")
                 httpTransactionDao.insert(transaction.toEntity())
+                enforceLimit()
             }
+        }
+    }
+
+    private suspend fun enforceLimit() {
+        try {
+            val settings = settingsRepository.observeSettings().first()
+            val max = settings.maxStoredRequests
+            if (max == -1) return
+
+            val count = httpTransactionDao.getCount()
+            if (count > max) {
+                val deleteCount = count - max
+                httpTransactionDao.deleteOldest(deleteCount)
+                Log.d(TAG, "enforceLimit: deleted $deleteCount oldest entries (max=$max)")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "enforceLimit error: ${e.message}")
         }
     }
 
