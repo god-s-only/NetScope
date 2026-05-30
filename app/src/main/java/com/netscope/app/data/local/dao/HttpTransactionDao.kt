@@ -18,15 +18,13 @@ interface HttpTransactionDao {
     suspend fun getById(id: String): HttpTransactionEntity?
 
     @Query("""
-        SELECT * FROM http_transactions 
-        WHERE (:query = '' OR url LIKE '%' || :query || '%' OR host LIKE '%' || :query || '%')
+        SELECT * FROM http_transactions
+        WHERE (:query = '' OR url LIKE '%' || :query || '%'
+        OR host LIKE '%' || :query || '%')
         ORDER BY timestampMs DESC
         LIMIT :limit
     """)
     fun observeFiltered(query: String, limit: Int = 500): Flow<List<HttpTransactionEntity>>
-
-    @Query("SELECT * FROM http_transactions WHERE uid = :uid ORDER BY timestampMs DESC")
-    fun observeByUid(uid: Int): Flow<List<HttpTransactionEntity>>
 
     @Query("SELECT * FROM http_transactions WHERE responseCode BETWEEN 400 AND 599 ORDER BY timestampMs DESC")
     fun observeErrors(): Flow<List<HttpTransactionEntity>>
@@ -37,17 +35,24 @@ interface HttpTransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: HttpTransactionEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(entities: List<HttpTransactionEntity>)
-
-    @Update
-    suspend fun update(entity: HttpTransactionEntity)
-
     @Query("DELETE FROM http_transactions WHERE id = :id")
     suspend fun deleteById(id: String)
 
     @Query("DELETE FROM http_transactions")
     suspend fun clearAll()
+
+    @Query("SELECT COUNT(*) FROM http_transactions")
+    suspend fun getCount(): Int
+
+    @Query("""
+        DELETE FROM http_transactions
+        WHERE id IN (
+            SELECT id FROM http_transactions
+            ORDER BY timestampMs ASC
+            LIMIT :count
+        )
+    """)
+    suspend fun deleteOldest(count: Int)
 
     @Query("SELECT COUNT(*) FROM http_transactions")
     fun observeCount(): Flow<Int>
