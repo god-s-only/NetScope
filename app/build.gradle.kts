@@ -84,4 +84,5 @@ dependencies {
     implementation(libs.conscrypt)
     implementation(libs.bouncycastle.pkix)
     implementation(libs.bouncycastle.prov)
+    implementation(libs.androidx.splashscreen)
 }

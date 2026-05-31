@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="Theme.NetScope" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#0D1117</item>
+        <item name="android:navigationBarColor">#0D1117</item>
+    </style>
 
-    <style name="Theme.NetScope" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.NetScope.SplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#00BFA5</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#00BFA5</item>
+        <item name="postSplashScreenTheme">@style/Theme.NetScope</item>
+    </style>
 </resources>

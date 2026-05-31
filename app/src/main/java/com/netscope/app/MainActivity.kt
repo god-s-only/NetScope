@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
 import com.netscope.app.presentation.navigation.NetScopeNavGraph
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
@@ -37,8 +38,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-        r3t24NpUrJMNunMMASmhAM953bFGeLXzN7()
+        requestNotificationPermission()
         enableEdgeToEdge()
         setContent {
             NetScopeTheme {
@@ -52,7 +54,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun r3t24NpUrJMNunMMASmhAM953bFGeLXzN7() {
+    private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
