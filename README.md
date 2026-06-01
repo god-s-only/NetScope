@@ -331,7 +331,7 @@ com.netscope.app/
 ### Clone and build
 
 ```bash
-git clone https://github.com/netscope/netscope.git
+git clone https://github.com/god-s-only/netscope.git
 cd netscope
 ```
 
