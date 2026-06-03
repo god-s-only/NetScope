@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/API-26%2B-brightgreen.svg" alt="API Level"/>
   </a>
   <a href="https://kotlinlang.org">
-    <img src="https://img.shields.io/badge/Kotlin-1.9.22-7F52FF?logo=kotlin" alt="Kotlin"/>
+    <img src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin" alt="Kotlin"/>
   </a>
   <a href="https://developer.android.com/jetpack/compose">
     <img src="https://img.shields.io/badge/Jetpack%20Compose-2024.02-4285F4?logo=jetpackcompose" alt="Compose"/>
