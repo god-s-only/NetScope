@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.viewModelScope
 import com.netscope.app.data.proxy.ProxyManager
 import com.netscope.app.data.proxy.cert.CertificateManager
+import com.netscope.app.domain.model.BandwidthSnapshot
+import com.netscope.app.domain.model.ConnectionEntry
 import com.netscope.app.domain.usecase.DetectAnomaliesUseCase
 import com.netscope.app.domain.usecase.ObserveBandwidthUseCase
 import com.netscope.app.domain.usecase.ObserveConnectionsUseCase
@@ -13,7 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
 @HiltViewModel
@@ -30,13 +32,17 @@ class DashboardViewModel @Inject constructor(
         context.getSharedPreferences("netscope_prefs", Context.MODE_PRIVATE)
 
     init {
-        updateState {
-            copy(
-                isCertificateInstalled = isCertInstalled(),
-                isProxyRunning = proxyManager.isRunning(),
-            )
-        }
+        updateState { copy(isCertificateInstalled = isCertInstalled()) }
+        observeProxyState()
         observeLiveData()
+    }
+
+    private fun observeProxyState() {
+        proxyManager.isRunningFlow
+            .onEach { running ->
+                updateState { copy(isProxyRunning = running) }
+            }
+            .launchIn(viewModelScope)
     }
 
     private fun observeLiveData() {
@@ -47,13 +53,14 @@ class DashboardViewModel @Inject constructor(
         ) { bandwidth, connections, anomalies ->
             updateState {
                 copy(
-                    totalUploadBytesPerSec   = bandwidth.totalUploadBytesPerSec,
+                    totalUploadBytesPerSec = bandwidth.totalUploadBytesPerSec,
                     totalDownloadBytesPerSec = bandwidth.totalDownloadBytesPerSec,
-                    perAppBandwidth          = bandwidth.perApp,
-                    topConsumer              = bandwidth.topConsumer,
-                    activeConnections        = connections.active,
-                    activeConnectionCount    = connections.activeCount,
-                    anomalies                = anomalies,
+                    perAppBandwidth = bandwidth.perApp,
+                    topConsumer = bandwidth.topConsumer,
+                    activeConnections = connections.active,
+                    activeConnectionCount = connections.activeCount,
+                    anomalies = anomalies,
+                    error = null,
                 )
             }
         }
@@ -71,10 +78,6 @@ class DashboardViewModel @Inject constructor(
 
     fun isCertInstalled(): Boolean =
         prefs.getBoolean("cert_installed", false)
-
-    fun onProxyStarted() = updateState { copy(isProxyRunning = true) }
-
-    fun onProxyStopped() = updateState { copy(isProxyRunning = false) }
 
     fun dismissError() = updateState { copy(error = null) }
 }
