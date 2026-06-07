@@ -7,13 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,9 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.netscope.app.domain.model.BandwidthSnapshot
 import com.netscope.app.domain.usecase.DetectAnomaliesUseCase
-import com.netscope.app.presentation.components.EmptyState
 import com.netscope.app.presentation.components.NetScopeTopBar
 import com.netscope.app.presentation.components.SectionHeader
 import com.netscope.app.presentation.components.StatCard
@@ -72,8 +67,7 @@ fun DashboardScreen(
     onNavigateToStats: () -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
-)
-{
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -101,128 +95,114 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
 
+            // ── Cert banner ───────────────────────────────────
             if (!state.isCertificateInstalled) {
                 item {
                     CertBanner(
                         onInstall = {
                             onInstallCertificate(viewModel.getCaCertificateBytes())
-                        }
+                        },
                     )
                 }
             }
 
+            // ── Proxy status ──────────────────────────────────
             item {
                 ProxyStatusBanner(
-                    isRunning   = state.isProxyRunning,
-                    onSetupTap  = onNavigateToSetup,
+                    isRunning = state.isProxyRunning,
+                    onSetupTap = onNavigateToSetup,
                 )
             }
 
+            // ── Bandwidth stats ───────────────────────────────
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     StatCard(
-                        label      = "Upload",
-                        value      = formatBytes(state.totalUploadBytesPerSec) + "/s",
+                        label = "Upload",
+                        value = formatBytes(state.totalUploadBytesPerSec) + "/s",
                         valueColor = NetScopeError,
-                        modifier   = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f),
                     )
                     StatCard(
-                        label      = "Download",
-                        value      = formatBytes(state.totalDownloadBytesPerSec) + "/s",
+                        label = "Download",
+                        value = formatBytes(state.totalDownloadBytesPerSec) + "/s",
                         valueColor = NetScopeSuccess,
-                        modifier   = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f),
                     )
                     StatCard(
-                        label      = "Connections",
-                        value      = state.activeConnectionCount.toString(),
+                        label = "Connections",
+                        value = state.activeConnectionCount.toString(),
                         valueColor = NetScopeInfo,
-                        modifier   = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
 
+            // ── Quick nav — row 1 ─────────────────────────────
             item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        QuickNavCard(
-                            icon = Icons.Default.List,
-                            label = "HTTP",
-                            onClick = onNavigateToTraffic,
-                            modifier = Modifier.weight(1f),
-                        )
-                        QuickNavCard(
-                            icon = Icons.Default.Dns,
-                            label = "DNS",
-                            onClick = onNavigateToDns,
-                            modifier = Modifier.weight(1f),
-                        )
-                        QuickNavCard(
-                            icon = Icons.Default.Timeline,
-                            label = "Timeline",
-                            onClick = onNavigateToTimeline,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        QuickNavCard(
-                            icon = Icons.Default.Cable,
-                            label = "Connections",
-                            onClick = onNavigateToConnections,
-                            modifier = Modifier.weight(1f),
-                        )
-                        QuickNavCard(
-                            icon = Icons.Default.BarChart,
-                            label = "Stats",
-                            onClick = onNavigateToStats,
-                            modifier = Modifier.weight(1f),
-                        )
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    QuickNavCard(
+                        icon = Icons.Default.List,
+                        label = "HTTP",
+                        onClick = onNavigateToTraffic,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.Dns,
+                        label = "DNS",
+                        onClick = onNavigateToDns,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.Timeline,
+                        label = "Timeline",
+                        onClick = onNavigateToTimeline,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
 
+            // ── Quick nav — row 2 ─────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    QuickNavCard(
+                        icon = Icons.Default.Cable,
+                        label = "Connections",
+                        onClick = onNavigateToConnections,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.BarChart,
+                        label = "Stats",
+                        onClick = onNavigateToStats,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // spacer to keep grid balanced
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
+
+            // ── Anomalies ─────────────────────────────────────
             if (state.anomalies.isNotEmpty()) {
                 item { SectionHeader(title = "Anomalies") }
                 items(state.anomalies) { anomaly ->
                     AnomalyCard(anomaly = anomaly)
                 }
             }
-
-            if (state.perAppBandwidth.isNotEmpty()) {
-                item { SectionHeader(title = "App traffic") }
-                items(
-                    items = state.perAppBandwidth,
-                    key   = { it.appInfo?.packageName ?: it.timestampMs.toString() },
-                ) { snapshot ->
-                    AppBandwidthRow(snapshot = snapshot)
-                }
-            }
-
-            if (!state.isProxyRunning) {
-                item {
-                    EmptyState(
-                        title    = "Proxy not running",
-                        subtitle = "Tap the settings icon to set up capture",
-                        modifier = Modifier.padding(top = 32.dp),
-                    )
-                }
-            }
         }
     }
 }
+
+// ── Sub-composables ───────────────────────────────────────────────────────────
 
 @Composable
 private fun CertBanner(onInstall: () -> Unit) {
@@ -235,15 +215,32 @@ private fun CertBanner(onInstall: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(Icons.Default.Security, null, tint = NetScopeWarning, modifier = Modifier.size(24.dp))
+        Icon(
+            Icons.Default.Security,
+            contentDescription = null,
+            tint = NetScopeWarning,
+            modifier = Modifier.size(24.dp),
+        )
         Column(modifier = Modifier.weight(1f)) {
-            Text("Install CA Certificate", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-            Text("Required for HTTPS capture", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(
+                text = "Install CA Certificate",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary,
+            )
+            Text(
+                text = "Required for HTTPS capture",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
         }
         Button(
             onClick = onInstall,
-            colors  = ButtonDefaults.buttonColors(containerColor = NetScopeWarning),
-        ) { Text("Install") }
+            colors = ButtonDefaults.buttonColors(
+                containerColor = NetScopeWarning,
+            ),
+        ) {
+            Text("Install")
+        }
     }
 }
 
@@ -257,7 +254,8 @@ private fun ProxyStatusBanner(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(
-                if (isRunning) NetScopePrimary.copy(alpha = 0.12f) else NetScopeSurface
+                if (isRunning) NetScopePrimary.copy(alpha = 0.12f)
+                else NetScopeSurface
             )
             .clickable(onClick = onSetupTap)
             .padding(16.dp),
@@ -265,19 +263,20 @@ private fun ProxyStatusBanner(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = if (isRunning) Icons.Default.Shield else Icons.Default.ShieldMoon,
+            imageVector = if (isRunning) Icons.Default.Shield
+            else Icons.Default.ShieldMoon,
             contentDescription = null,
             tint = if (isRunning) NetScopePrimary else TextSecondary,
             modifier = Modifier.size(28.dp),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text  = if (isRunning) "Proxy active" else "Proxy not running",
+                text = if (isRunning) "Proxy active" else "Proxy not running",
                 style = MaterialTheme.typography.titleMedium,
                 color = if (isRunning) NetScopePrimary else TextSecondary,
             )
             Text(
-                text  = if (isRunning)
+                text = if (isRunning)
                     "Capturing traffic on 127.0.0.1:8888"
                 else
                     "Tap to open setup",
@@ -285,7 +284,12 @@ private fun ProxyStatusBanner(
                 color = TextSecondary,
             )
         }
-        Icon(Icons.Default.Settings, null, tint = TextTertiary, modifier = Modifier.size(18.dp))
+        Icon(
+            Icons.Default.Settings,
+            contentDescription = null,
+            tint = TextTertiary,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -296,26 +300,36 @@ private fun QuickNavCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(NetScopeSurface)
             .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = label, tint = NetScopePrimary, modifier = Modifier.size(22.dp))
-        Text(label, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = NetScopePrimary,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 
 @Composable
 private fun AnomalyCard(anomaly: DetectAnomaliesUseCase.Anomaly) {
     val color = when (anomaly.severity) {
-        DetectAnomaliesUseCase.Severity.HIGH   -> NetScopeError
+        DetectAnomaliesUseCase.Severity.HIGH -> NetScopeError
         DetectAnomaliesUseCase.Severity.MEDIUM -> NetScopeWarning
-        DetectAnomaliesUseCase.Severity.LOW    -> NetScopeInfo
+        DetectAnomaliesUseCase.Severity.LOW -> NetScopeInfo
     }
     Row(
         modifier = Modifier
@@ -333,29 +347,16 @@ private fun AnomalyCard(anomaly: DetectAnomaliesUseCase.Anomaly) {
                 .background(color),
         )
         Column {
-            Text(anomaly.appName ?: "Unknown", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-            Text(anomaly.description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        }
-    }
-}
-
-@Composable
-private fun AppBandwidthRow(snapshot: BandwidthSnapshot) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(NetScopeSurface)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(snapshot.appInfo?.appName ?: "Unknown", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-            Text(snapshot.appInfo?.packageName ?: "", style = MaterialTheme.typography.bodySmall, color = TextTertiary)
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text("↑ ${formatBytes(snapshot.uploadBytesPerSec)}/s", style = MaterialTheme.typography.bodySmall, color = NetScopeError)
-            Text("↓ ${formatBytes(snapshot.downloadBytesPerSec)}/s", style = MaterialTheme.typography.bodySmall, color = NetScopeSuccess)
+            Text(
+                text = anomaly.appName ?: "Unknown",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary,
+            )
+            Text(
+                text = anomaly.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
         }
     }
 }
