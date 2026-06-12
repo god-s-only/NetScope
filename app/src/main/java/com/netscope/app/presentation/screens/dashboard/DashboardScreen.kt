@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -118,7 +119,7 @@ fun DashboardScreen(
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     StatCard(
                         label = "Upload",
@@ -133,7 +134,7 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f),
                     )
                     StatCard(
-                        label = "Connections",
+                        label = "Conns",
                         value = state.activeConnectionCount.toString(),
                         valueColor = NetScopeInfo,
                         modifier = Modifier.weight(1f),
@@ -141,54 +142,15 @@ fun DashboardScreen(
                 }
             }
 
-            // ── Quick nav — row 1 ─────────────────────────────
+            // ── Quick nav grid (2-column) ─────────────────────
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    QuickNavCard(
-                        icon = Icons.Default.List,
-                        label = "HTTP",
-                        onClick = onNavigateToTraffic,
-                        modifier = Modifier.weight(1f),
-                    )
-                    QuickNavCard(
-                        icon = Icons.Default.Dns,
-                        label = "DNS",
-                        onClick = onNavigateToDns,
-                        modifier = Modifier.weight(1f),
-                    )
-                    QuickNavCard(
-                        icon = Icons.Default.Timeline,
-                        label = "Timeline",
-                        onClick = onNavigateToTimeline,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            // ── Quick nav — row 2 ─────────────────────────────
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    QuickNavCard(
-                        icon = Icons.Default.Cable,
-                        label = "Connections",
-                        onClick = onNavigateToConnections,
-                        modifier = Modifier.weight(1f),
-                    )
-                    QuickNavCard(
-                        icon = Icons.Default.BarChart,
-                        label = "Stats",
-                        onClick = onNavigateToStats,
-                        modifier = Modifier.weight(1f),
-                    )
-                    // spacer to keep grid balanced
-                    Box(modifier = Modifier.weight(1f))
-                }
+                QuickNavGrid(
+                    onNavigateToTraffic = onNavigateToTraffic,
+                    onNavigateToDns = onNavigateToDns,
+                    onNavigateToTimeline = onNavigateToTimeline,
+                    onNavigateToConnections = onNavigateToConnections,
+                    onNavigateToStats = onNavigateToStats,
+                )
             }
 
             // ── Anomalies ─────────────────────────────────────
@@ -224,22 +186,29 @@ private fun CertBanner(onInstall: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Install CA Certificate",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = "Required for HTTPS capture",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Button(
             onClick = onInstall,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = NetScopeWarning,
-            ),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = NetScopeWarning),
         ) {
-            Text("Install")
+            Text(
+                text = "Install",
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -254,8 +223,7 @@ private fun ProxyStatusBanner(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(
-                if (isRunning) NetScopePrimary.copy(alpha = 0.12f)
-                else NetScopeSurface
+                if (isRunning) NetScopePrimary.copy(alpha = 0.12f) else NetScopeSurface,
             )
             .clickable(onClick = onSetupTap)
             .padding(16.dp),
@@ -263,8 +231,7 @@ private fun ProxyStatusBanner(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = if (isRunning) Icons.Default.Shield
-            else Icons.Default.ShieldMoon,
+            imageVector = if (isRunning) Icons.Default.Shield else Icons.Default.ShieldMoon,
             contentDescription = null,
             tint = if (isRunning) NetScopePrimary else TextSecondary,
             modifier = Modifier.size(28.dp),
@@ -272,16 +239,17 @@ private fun ProxyStatusBanner(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = if (isRunning) "Proxy active" else "Proxy not running",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = if (isRunning) NetScopePrimary else TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = if (isRunning)
-                    "Capturing traffic on 127.0.0.1:8888"
-                else
-                    "Tap to open setup",
+                text = if (isRunning) "Capturing on 127.0.0.1:8888" else "Tap to open setup",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Icon(
@@ -289,6 +257,61 @@ private fun ProxyStatusBanner(
             contentDescription = null,
             tint = TextTertiary,
             modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun QuickNavGrid(
+    onNavigateToTraffic: () -> Unit,
+    onNavigateToDns: () -> Unit,
+    onNavigateToTimeline: () -> Unit,
+    onNavigateToConnections: () -> Unit,
+    onNavigateToStats: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Row 1
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            QuickNavCard(
+                icon = Icons.Default.List,
+                label = "HTTP",
+                onClick = onNavigateToTraffic,
+                modifier = Modifier.weight(1f),
+            )
+            QuickNavCard(
+                icon = Icons.Default.Dns,
+                label = "DNS",
+                onClick = onNavigateToDns,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        // Row 2
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            QuickNavCard(
+                icon = Icons.Default.Timeline,
+                label = "Timeline",
+                onClick = onNavigateToTimeline,
+                modifier = Modifier.weight(1f),
+            )
+            QuickNavCard(
+                icon = Icons.Default.Cable,
+                label = "Connections",
+                onClick = onNavigateToConnections,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        // Row 3 — Stats spans full width
+        QuickNavCard(
+            icon = Icons.Default.BarChart,
+            label = "Stats",
+            onClick = onNavigateToStats,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -305,7 +328,7 @@ private fun QuickNavCard(
             .clip(RoundedCornerShape(12.dp))
             .background(NetScopeSurface)
             .clickable(onClick = onClick)
-            .padding(vertical = 16.dp),
+            .padding(vertical = 16.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -313,12 +336,14 @@ private fun QuickNavCard(
             imageVector = icon,
             contentDescription = label,
             tint = NetScopePrimary,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(20.dp),
         )
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
             color = TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
     }
@@ -346,16 +371,20 @@ private fun AnomalyCard(anomaly: DetectAnomaliesUseCase.Anomaly) {
                 .clip(RoundedCornerShape(4.dp))
                 .background(color),
         )
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = anomaly.appName ?: "Unknown",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = anomaly.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
