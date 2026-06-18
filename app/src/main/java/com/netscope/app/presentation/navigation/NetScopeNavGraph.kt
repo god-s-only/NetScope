@@ -2,17 +2,23 @@ package com.netscope.app.presentation.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.netscope.app.domain.repository.SettingsRepository
 import com.netscope.app.presentation.screens.connections.ConnectionsScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
 import com.netscope.app.presentation.screens.dns.DnsScreen
+import com.netscope.app.presentation.screens.onboarding.OnboardingScreen
 import com.netscope.app.presentation.screens.replay.ReplayScreen
 import com.netscope.app.presentation.screens.settings.SettingsScreen
 import com.netscope.app.presentation.screens.setup.ProxySetupScreen
@@ -25,11 +31,36 @@ fun NetScopeNavGraph(
     navController: NavHostController,
     onInstallCertificate: (ByteArray) -> Unit,
     onDashboardReady: (DashboardViewModel) -> Unit,
+    settingsRepository: SettingsRepository,
 ) {
+    // determine start destination before rendering NavHost
+    var startDestination by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        startDestination = if (settingsRepository.isOnboardingCompleted()) {
+            NavRoutes.DASHBOARD
+        } else {
+            NavRoutes.ONBOARDING
+        }
+    }
+
+    // wait until we know start destination to avoid flicker
+    val destination = startDestination ?: return
+
     NavHost(
         navController = navController,
-        startDestination = NavRoutes.DASHBOARD,
+        startDestination = destination,
     ) {
+
+        composable(NavRoutes.ONBOARDING) {
+            OnboardingScreen(
+                onFinished = {
+                    navController.navigate(NavRoutes.DASHBOARD) {
+                        popUpTo(NavRoutes.ONBOARDING) { inclusive = true }
+                    }
+                },
+            )
+        }
 
         composable(NavRoutes.DASHBOARD) {
             val viewModel = hiltViewModel<DashboardViewModel>()
@@ -93,8 +124,17 @@ fun NetScopeNavGraph(
         }
 
         composable(NavRoutes.CONNECTIONS) {
-            ConnectionsScreen(
+            ConnectionsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable(NavRoutes.STATS) {
+            StatsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable(NavRoutes.SETTINGS) {
+            SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
             )
         }
 
@@ -105,15 +145,6 @@ fun NetScopeNavGraph(
             ),
         ) {
             ReplayScreen(onNavigateBack = { navController.popBackStack() })
-        }
-        composable(NavRoutes.STATS) {
-            StatsScreen(onNavigateBack = { navController.popBackStack() })
-        }
-        composable(NavRoutes.SETTINGS) {
-            SettingsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
-            )
         }
     }
 }

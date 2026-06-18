@@ -1,6 +1,7 @@
 package com.netscope.app.presentation.navigation
 
 object NavRoutes {
+    const val ONBOARDING = "onboarding"
     const val DASHBOARD = "dashboard"
     const val SETUP = "setup"
     const val TRAFFIC_LIST = "traffic_list"

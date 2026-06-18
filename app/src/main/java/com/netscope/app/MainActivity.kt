@@ -13,13 +13,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
+import com.netscope.app.domain.repository.SettingsRepository
 import com.netscope.app.presentation.navigation.NetScopeNavGraph
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.theme.NetScopeTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var settingsRepository: SettingsRepository
 
     private var dashboardViewModel: DashboardViewModel? = null
 
@@ -38,7 +42,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         requestNotificationPermission()
         enableEdgeToEdge()
@@ -49,6 +53,7 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     onInstallCertificate = ::installCert,
                     onDashboardReady = { vm -> dashboardViewModel = vm },
+                    settingsRepository = settingsRepository,
                 )
             }
         }
