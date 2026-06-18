@@ -8,4 +8,6 @@ interface SettingsRepository {
     suspend fun setMaxStoredRequests(max: Int)
     suspend fun setAutoScrollTrafficList(enabled: Boolean)
     suspend fun setShowReplayedRequests(enabled: Boolean)
+    suspend fun setOnboardingCompleted()
+    suspend fun isOnboardingCompleted(): Boolean
 }
