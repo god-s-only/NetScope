@@ -10,8 +10,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStream
-import java.io.InputStreamReader
 import java.io.OutputStream
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.KeyStore
@@ -69,13 +70,11 @@ class LocalProxyServer @Inject constructor(
 
     fun isRunning() = isRunning
 
-
     private suspend fun handleClient(client: Socket) {
         try {
             client.soTimeout = 30_000
-            val input  = client.getInputStream()
+            val reader = client.getInputStream().bufferedReader()
             val output = client.getOutputStream()
-            val reader = input.bufferedReader()
 
             val requestLine = reader.readLine()?.trim() ?: return
             Log.d(TAG, "Request: $requestLine")
@@ -98,13 +97,13 @@ class LocalProxyServer @Inject constructor(
         }
     }
 
-
     private suspend fun handleConnect(
         client: Socket,
         target: String,
         reader: BufferedReader,
         output: OutputStream,
     ) {
+        // consume CONNECT headers
         var line = reader.readLine()
         while (!line.isNullOrBlank()) {
             line = reader.readLine()
@@ -146,7 +145,6 @@ class LocalProxyServer @Inject constructor(
         }
     }
 
-
     private suspend fun handlePlainHttp(
         method: String,
         target: String,
@@ -154,24 +152,22 @@ class LocalProxyServer @Inject constructor(
         clientOutput: OutputStream,
     ) {
         val isAbsolute = target.startsWith("http://", ignoreCase = true)
-
+        val hostHint = if (isAbsolute) extractHost(target) else null
+        val portHint = if (isAbsolute) extractPort(target, 80) else 80
+        val pathHint = if (isAbsolute) extractPath(target) else target
         val url = if (isAbsolute) target else null
-        val hostFromUrl = if (isAbsolute) extractHost(target) else null
-        val portFromUrl = if (isAbsolute) extractPort(target, 80) else 80
-        val pathFromUrl = if (isAbsolute) extractPath(target) else target
 
         captureAndForward(
             method = method,
             targetUrl = url,
-            hostHint = hostFromUrl,
-            portHint = portFromUrl,
-            pathHint = pathFromUrl,
+            hostHint = hostHint,
+            portHint = portHint,
+            pathHint = pathHint,
             isHttps = false,
             reader = reader,
             clientOutput = clientOutput,
         )
     }
-
 
     private suspend fun captureAndForward(
         method: String,
@@ -182,7 +178,6 @@ class LocalProxyServer @Inject constructor(
         isHttps: Boolean,
         reader: BufferedReader,
         clientOutput: OutputStream,
-        hostnameForTls: String? = null,
     ) {
         val startMs = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
@@ -210,7 +205,7 @@ class LocalProxyServer @Inject constructor(
             hostHeader.contains(":") -> hostHeader.substringBefore(":")
             hostHeader.isNotBlank() -> hostHeader
             else -> {
-                Log.e(TAG, "Cannot determine host for request $method $pathHint")
+                Log.e(TAG, "Cannot determine host")
                 clientOutput.write(
                     "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n".toByteArray()
                 )
@@ -234,10 +229,11 @@ class LocalProxyServer @Inject constructor(
             String(buf)
         } else null
 
-        Log.d(TAG, "Forwarding: $method $url → $host:$port")
+        Log.d(TAG, "Forwarding: $method $url")
 
         try {
-            val serverSocket = Socket(host, port)
+            val serverSocket = Socket(Proxy.NO_PROXY)
+            serverSocket.connect(InetSocketAddress(host, port), 10_000)
             serverSocket.soTimeout = 30_000
 
             val serverOut: OutputStream
@@ -342,8 +338,7 @@ class LocalProxyServer @Inject constructor(
 
         } catch (e: Exception) {
             val durationMs = System.currentTimeMillis() - startMs
-            Log.e(TAG, "captureAndForward failed for $host:$port — " +
-                    "${e.javaClass.simpleName}: ${e.message}")
+            Log.e(TAG, "Forward failed for $host: ${e.javaClass.simpleName}: ${e.message}")
 
             transactionEmitter.emit(
                 HttpTransaction(
@@ -385,10 +380,14 @@ class LocalProxyServer @Inject constructor(
             ks.load(null, null)
             ks.setKeyEntry("key", key, "".toCharArray(), arrayOf(cert))
 
-            val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+            val kmf = KeyManagerFactory.getInstance(
+                KeyManagerFactory.getDefaultAlgorithm()
+            )
             kmf.init(ks, "".toCharArray())
 
-            val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+            val tmf = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm()
+            )
             tmf.init(null as KeyStore?)
 
             val sslCtx = SSLContext.getInstance("TLS")
@@ -400,7 +399,7 @@ class LocalProxyServer @Inject constructor(
             sslSocket.startHandshake()
             sslSocket
         } catch (e: Exception) {
-            Log.w(TAG, "upgradeTls failed for $host: ${e.message}")
+            Log.w(TAG, "TLS upgrade failed for $host: ${e.message}")
             null
         }
     }
@@ -415,7 +414,7 @@ class LocalProxyServer @Inject constructor(
                 transferEncoding.equals("chunked", ignoreCase = true) -> {
                     val sb = StringBuilder()
                     while (true) {
-                        val sizeLine  = reader.readLine()?.trim() ?: break
+                        val sizeLine = reader.readLine()?.trim() ?: break
                         val chunkSize = sizeLine.toIntOrNull(16) ?: break
                         if (chunkSize == 0) break
                         val buf = CharArray(chunkSize.coerceAtMost(MAX_BODY_BYTES))
@@ -438,7 +437,6 @@ class LocalProxyServer @Inject constructor(
         }
     }
 
-
     private fun splitHostPort(target: String, default: Int): Pair<String, Int> {
         val parts = target.split(":")
         return Pair(parts[0], parts.getOrNull(1)?.toIntOrNull() ?: default)
@@ -460,13 +458,13 @@ class LocalProxyServer @Inject constructor(
     } catch (e: Exception) { "/" }
 
     private fun parseMethod(method: String): HttpMethod = when (method) {
-        "GET"     -> HttpMethod.GET
-        "POST"    -> HttpMethod.POST
-        "PUT"     -> HttpMethod.PUT
-        "DELETE"  -> HttpMethod.DELETE
-        "PATCH"   -> HttpMethod.PATCH
-        "HEAD"    -> HttpMethod.HEAD
+        "GET" -> HttpMethod.GET
+        "POST" -> HttpMethod.POST
+        "PUT" -> HttpMethod.PUT
+        "DELETE" -> HttpMethod.DELETE
+        "PATCH" -> HttpMethod.PATCH
+        "HEAD" -> HttpMethod.HEAD
         "OPTIONS" -> HttpMethod.OPTIONS
-        else      -> HttpMethod.UNKNOWN
+        else -> HttpMethod.UNKNOWN
     }
 }
