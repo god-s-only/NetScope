@@ -22,6 +22,6 @@ class NetScopeApp : Application() {
     override fun onCreate() {
         super.onCreate()
         certificateManager.initialize()
-        Log.d("NetScopeApp", "App started — all repositories initialized")
+        Log.d("NetScopeApp", "App started")
     }
 }

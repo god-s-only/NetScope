@@ -52,7 +52,7 @@ import com.netscope.app.presentation.theme.TextTertiary
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToSetup: () -> Unit,
+    onNavigateToIntegration: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -132,7 +132,7 @@ fun SettingsScreen(
                                     NetScopeSuccess else NetScopeError,
                             )
                         }
-                        OutlinedButton(onClick = onNavigateToSetup) {
+                        OutlinedButton(onClick = onNavigateToIntegration) {
                             Text(
                                 if (state.isCertInstalled) "Reinstall"
                                 else "Install",
