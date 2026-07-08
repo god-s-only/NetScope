@@ -2,7 +2,6 @@ package com.netscope.app.presentation.screens.dashboard
 
 import android.content.Context
 import androidx.lifecycle.viewModelScope
-import com.netscope.app.data.proxy.ProxyManager
 import com.netscope.app.data.proxy.cert.CertificateManager
 import com.netscope.app.domain.model.BandwidthSnapshot
 import com.netscope.app.domain.model.ConnectionEntry
@@ -15,13 +14,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val proxyManager: ProxyManager,
     private val certificateManager: CertificateManager,
     private val observeBandwidthUseCase: ObserveBandwidthUseCase,
     private val observeConnectionsUseCase: ObserveConnectionsUseCase,
@@ -33,16 +30,7 @@ class DashboardViewModel @Inject constructor(
 
     init {
         updateState { copy(isCertificateInstalled = isCertInstalled()) }
-        observeProxyState()
         observeLiveData()
-    }
-
-    private fun observeProxyState() {
-        proxyManager.isRunningFlow
-            .onEach { running ->
-                updateState { copy(isProxyRunning = running) }
-            }
-            .launchIn(viewModelScope)
     }
 
     private fun observeLiveData() {
