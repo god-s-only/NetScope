@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "NetScope"
 include(":app")
+include(":interceptor")
