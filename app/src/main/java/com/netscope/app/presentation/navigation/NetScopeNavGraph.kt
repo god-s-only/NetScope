@@ -18,10 +18,10 @@ import com.netscope.app.presentation.screens.dashboard.DashboardScreen
 import com.netscope.app.presentation.screens.dashboard.DashboardViewModel
 import com.netscope.app.presentation.screens.detail.TrafficDetailScreen
 import com.netscope.app.presentation.screens.dns.DnsScreen
+import com.netscope.app.presentation.screens.integration.IntegrationScreen
 import com.netscope.app.presentation.screens.onboarding.OnboardingScreen
 import com.netscope.app.presentation.screens.replay.ReplayScreen
 import com.netscope.app.presentation.screens.settings.SettingsScreen
-import com.netscope.app.presentation.screens.integration.ProxySetupScreen
 import com.netscope.app.presentation.screens.stats.StatsScreen
 import com.netscope.app.presentation.screens.timeline.TimelineScreen
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
@@ -33,7 +33,6 @@ fun NetScopeNavGraph(
     onDashboardReady: (DashboardViewModel) -> Unit,
     settingsRepository: SettingsRepository,
 ) {
-    // determine start destination before rendering NavHost
     var startDestination by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -44,7 +43,6 @@ fun NetScopeNavGraph(
         }
     }
 
-    // wait until we know start destination to avoid flicker
     val destination = startDestination ?: return
 
     NavHost(
@@ -67,23 +65,34 @@ fun NetScopeNavGraph(
             LaunchedEffect(viewModel) { onDashboardReady(viewModel) }
             DashboardScreen(
                 onInstallCertificate = onInstallCertificate,
-                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
-                onNavigateToTraffic = { navController.navigate(NavRoutes.TRAFFIC_LIST) },
-                onNavigateToDns = { navController.navigate(NavRoutes.DNS) },
-                onNavigateToTimeline = { navController.navigate(NavRoutes.TIMELINE) },
-                onNavigateToConnections = { navController.navigate(NavRoutes.CONNECTIONS) },
-                onNavigateToStats = { navController.navigate(NavRoutes.STATS) },
-                onNavigateToSettings = { navController.navigate(NavRoutes.SETTINGS) },
+                onNavigateToIntegration = {
+                    navController.navigate(NavRoutes.INTEGRATION)
+                },
+                onNavigateToTraffic = {
+                    navController.navigate(NavRoutes.TRAFFIC_LIST)
+                },
+                onNavigateToDns = {
+                    navController.navigate(NavRoutes.DNS)
+                },
+                onNavigateToTimeline = {
+                    navController.navigate(NavRoutes.TIMELINE)
+                },
+                onNavigateToConnections = {
+                    navController.navigate(NavRoutes.CONNECTIONS)
+                },
+                onNavigateToStats = {
+                    navController.navigate(NavRoutes.STATS)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(NavRoutes.SETTINGS)
+                },
                 viewModel = viewModel,
             )
         }
 
-        composable(NavRoutes.SETUP) {
-            ProxySetupScreen(
-                onInstallCertificate = onInstallCertificate,
-                onNavigateToTraffic = {
-                    navController.navigate(NavRoutes.TRAFFIC_LIST)
-                },
+        composable(NavRoutes.INTEGRATION) {
+            IntegrationScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 
@@ -124,7 +133,9 @@ fun NetScopeNavGraph(
         }
 
         composable(NavRoutes.CONNECTIONS) {
-            ConnectionsScreen(onNavigateBack = { navController.popBackStack() })
+            ConnectionsScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
         }
 
         composable(NavRoutes.STATS) {
@@ -134,7 +145,9 @@ fun NetScopeNavGraph(
         composable(NavRoutes.SETTINGS) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToSetup = { navController.navigate(NavRoutes.SETUP) },
+                onNavigateToIntegration = {
+                    navController.navigate(NavRoutes.INTEGRATION)
+                },
             )
         }
 

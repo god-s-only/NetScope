@@ -3,7 +3,7 @@ package com.netscope.app.presentation.navigation
 object NavRoutes {
     const val ONBOARDING = "onboarding"
     const val DASHBOARD = "dashboard"
-    const val SETUP = "setup"
+    const val INTEGRATION = "integration"
     const val TRAFFIC_LIST = "traffic_list"
     const val TRAFFIC_DETAIL = "traffic_detail/{${NavArgs.TRANSACTION_ID}}"
     const val DNS = "dns"

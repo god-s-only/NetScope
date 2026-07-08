@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cable
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Security
@@ -60,7 +62,7 @@ import com.netscope.app.presentation.theme.TextTertiary
 @Composable
 fun DashboardScreen(
     onInstallCertificate: (ByteArray) -> Unit,
-    onNavigateToSetup: () -> Unit,
+    onNavigateToIntegration: () -> Unit,
     onNavigateToTraffic: () -> Unit,
     onNavigateToDns: () -> Unit,
     onNavigateToTimeline: () -> Unit,
@@ -96,7 +98,7 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
 
-            // ── Cert banner ───────────────────────────────────
+            // cert banner
             if (!state.isCertificateInstalled) {
                 item {
                     CertBanner(
@@ -107,19 +109,16 @@ fun DashboardScreen(
                 }
             }
 
-            // ── Proxy status ──────────────────────────────────
+            // integration banner — always visible, tappable
             item {
-                ProxyStatusBanner(
-                    isRunning = state.isProxyRunning,
-                    onSetupTap = onNavigateToSetup,
-                )
+                IntegrationBanner(onClick = onNavigateToIntegration)
             }
 
-            // ── Bandwidth stats ───────────────────────────────
+            // bandwidth stats
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     StatCard(
                         label = "Upload",
@@ -134,7 +133,7 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f),
                     )
                     StatCard(
-                        label = "Conns",
+                        label = "Connections",
                         value = state.activeConnectionCount.toString(),
                         valueColor = NetScopeInfo,
                         modifier = Modifier.weight(1f),
@@ -142,18 +141,56 @@ fun DashboardScreen(
                 }
             }
 
-            // ── Quick nav grid (2-column) ─────────────────────
+            // quick nav row 1
             item {
-                QuickNavGrid(
-                    onNavigateToTraffic = onNavigateToTraffic,
-                    onNavigateToDns = onNavigateToDns,
-                    onNavigateToTimeline = onNavigateToTimeline,
-                    onNavigateToConnections = onNavigateToConnections,
-                    onNavigateToStats = onNavigateToStats,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    QuickNavCard(
+                        icon = Icons.Default.List,
+                        label = "HTTP",
+                        onClick = onNavigateToTraffic,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.Dns,
+                        label = "DNS",
+                        onClick = onNavigateToDns,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.Timeline,
+                        label = "Timeline",
+                        onClick = onNavigateToTimeline,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
-            // ── Anomalies ─────────────────────────────────────
+            // quick nav row 2
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    QuickNavCard(
+                        icon = Icons.Default.Cable,
+                        label = "Connections",
+                        onClick = onNavigateToConnections,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickNavCard(
+                        icon = Icons.Default.BarChart,
+                        label = "Stats",
+                        onClick = onNavigateToStats,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
+
+            // anomalies
             if (state.anomalies.isNotEmpty()) {
                 item { SectionHeader(title = "Anomalies") }
                 items(state.anomalies) { anomaly ->
@@ -161,6 +198,45 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun IntegrationBanner(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(NetScopePrimary.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            Icons.Default.Code,
+            contentDescription = null,
+            tint = NetScopePrimary,
+            modifier = Modifier.size(28.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Add to your app",
+                style = MaterialTheme.typography.titleMedium,
+                color = NetScopePrimary,
+            )
+            Text(
+                text = "One dependency, one line — capture traffic instantly",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = TextTertiary,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -210,109 +286,6 @@ private fun CertBanner(onInstall: () -> Unit) {
                 maxLines = 1,
             )
         }
-    }
-}
-
-@Composable
-private fun ProxyStatusBanner(
-    isRunning: Boolean,
-    onSetupTap: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isRunning) NetScopePrimary.copy(alpha = 0.12f) else NetScopeSurface,
-            )
-            .clickable(onClick = onSetupTap)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            imageVector = if (isRunning) Icons.Default.Shield else Icons.Default.ShieldMoon,
-            contentDescription = null,
-            tint = if (isRunning) NetScopePrimary else TextSecondary,
-            modifier = Modifier.size(28.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = if (isRunning) "Proxy active" else "Proxy not running",
-                style = MaterialTheme.typography.titleSmall,
-                color = if (isRunning) NetScopePrimary else TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = if (isRunning) "Capturing on 127.0.0.1:8888" else "Tap to open setup",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Icon(
-            Icons.Default.Settings,
-            contentDescription = null,
-            tint = TextTertiary,
-            modifier = Modifier.size(18.dp),
-        )
-    }
-}
-
-@Composable
-private fun QuickNavGrid(
-    onNavigateToTraffic: () -> Unit,
-    onNavigateToDns: () -> Unit,
-    onNavigateToTimeline: () -> Unit,
-    onNavigateToConnections: () -> Unit,
-    onNavigateToStats: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Row 1
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            QuickNavCard(
-                icon = Icons.Default.List,
-                label = "HTTP",
-                onClick = onNavigateToTraffic,
-                modifier = Modifier.weight(1f),
-            )
-            QuickNavCard(
-                icon = Icons.Default.Dns,
-                label = "DNS",
-                onClick = onNavigateToDns,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        // Row 2
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            QuickNavCard(
-                icon = Icons.Default.Timeline,
-                label = "Timeline",
-                onClick = onNavigateToTimeline,
-                modifier = Modifier.weight(1f),
-            )
-            QuickNavCard(
-                icon = Icons.Default.Cable,
-                label = "Connections",
-                onClick = onNavigateToConnections,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        // Row 3 — Stats spans full width
-        QuickNavCard(
-            icon = Icons.Default.BarChart,
-            label = "Stats",
-            onClick = onNavigateToStats,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
