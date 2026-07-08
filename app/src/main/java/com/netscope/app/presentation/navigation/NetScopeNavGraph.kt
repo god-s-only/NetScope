@@ -21,7 +21,7 @@ import com.netscope.app.presentation.screens.dns.DnsScreen
 import com.netscope.app.presentation.screens.onboarding.OnboardingScreen
 import com.netscope.app.presentation.screens.replay.ReplayScreen
 import com.netscope.app.presentation.screens.settings.SettingsScreen
-import com.netscope.app.presentation.screens.setup.ProxySetupScreen
+import com.netscope.app.presentation.screens.integration.ProxySetupScreen
 import com.netscope.app.presentation.screens.stats.StatsScreen
 import com.netscope.app.presentation.screens.timeline.TimelineScreen
 import com.netscope.app.presentation.screens.traffic.TrafficListScreen
