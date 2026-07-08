@@ -85,4 +85,5 @@ dependencies {
     implementation(libs.bouncycastle.pkix)
     implementation(libs.bouncycastle.prov)
     implementation(libs.androidx.splashscreen)
+    implementation(project(":interceptor"))
 }
