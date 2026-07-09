@@ -1,12 +1,10 @@
 package com.netscope.app.domain.usecase
 
 import android.util.Log
-import com.netscope.app.data.proxy.LocalProxyServer
 import com.netscope.app.domain.model.HttpMethod
 import com.netscope.app.domain.model.HttpTransaction
 import com.netscope.app.domain.repository.TrafficRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.net.Socket
@@ -14,6 +12,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 private const val TAG = "ReplayRequestUseCase"
+private const val PROXY_PORT = 8888
 
 class ReplayRequestUseCase @Inject constructor(
     private val trafficRepository: TrafficRepository,
@@ -40,16 +39,15 @@ class ReplayRequestUseCase @Inject constructor(
             val id = UUID.randomUUID().toString()
 
             try {
-                val socket = Socket("127.0.0.1", LocalProxyServer.PORT)
+                val socket = Socket("127.0.0.1", PROXY_PORT)
                 socket.soTimeout = 30_000
 
                 val output = socket.getOutputStream()
                 val reader = socket.getInputStream().bufferedReader()
 
                 val isHttps = url.startsWith("https://", ignoreCase = true)
-                val host = extractHost(url) ?: return@withContext ReplayResult.Failure(
-                    "Invalid URL: $url"
-                )
+                val host = extractHost(url)
+                    ?: return@withContext ReplayResult.Failure("Invalid URL: $url")
                 val path = extractPath(url)
 
                 if (isHttps) {
@@ -60,8 +58,7 @@ class ReplayRequestUseCase @Inject constructor(
                     output.flush()
 
                     val connectResponse = reader.readLine()
-                    if (connectResponse == null ||
-                        !connectResponse.contains("200")) {
+                    if (connectResponse == null || !connectResponse.contains("200")) {
                         return@withContext ReplayResult.Failure(
                             "Proxy CONNECT failed: $connectResponse"
                         )
@@ -127,25 +124,25 @@ class ReplayRequestUseCase @Inject constructor(
 
                 runCatching { socket.close() }
 
-                Log.d(TAG, "Replay success: $method $url → $statusCode (${durationMs}ms)")
+                Log.d(TAG, "Replay: $method $url → $statusCode (${durationMs}ms)")
 
-                val replayTransaction = original.copy(
-                    id = id,
-                    timestampMs = startMs,
-                    url = url,
-                    requestHeaders = headers,
-                    requestBody = body,
-                    responseCode = statusCode,
-                    responseMessage = statusMessage,
-                    responseHeaders = responseHeaders,
-                    responseBody = responseBody,
-                    responseSizeBytes = responseBody.toByteArray().size.toLong(),
-                    durationMs = durationMs,
-                    isReplay = true,
-                    error = null,
+                ReplayResult.Success(
+                    original.copy(
+                        id = id,
+                        timestampMs = startMs,
+                        url = url,
+                        requestHeaders = headers,
+                        requestBody = body,
+                        responseCode = statusCode,
+                        responseMessage = statusMessage,
+                        responseHeaders = responseHeaders,
+                        responseBody = responseBody,
+                        responseSizeBytes = responseBody.toByteArray().size.toLong(),
+                        durationMs = durationMs,
+                        isReplay = true,
+                        error = null,
+                    )
                 )
-
-                ReplayResult.Success(replayTransaction)
 
             } catch (e: Exception) {
                 Log.w(TAG, "Replay failed: ${e.message}")
