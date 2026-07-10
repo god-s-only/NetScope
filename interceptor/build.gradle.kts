@@ -31,6 +31,8 @@ android {
 dependencies {
     implementation(libs.okhttp.core)
     implementation(libs.gson)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
 }
 
 publishing {
