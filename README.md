@@ -86,7 +86,7 @@ In your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    debugImplementation("com.github.YOUR_USERNAME:NetScope:1.0.0")
+    debugImplementation("com.github.god-s-only:NetScope:v1.0.0")
 }
 ```
 
