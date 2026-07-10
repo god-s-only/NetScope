@@ -41,6 +41,7 @@ publishing {
             groupId = "com.netscope"
             artifactId = "interceptor"
             version = "1.0.0"
+
             afterEvaluate {
                 from(components["release"])
             }
