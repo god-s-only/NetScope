@@ -368,7 +368,7 @@ repositories {
 }
 
 // build.gradle.kts
-debugImplementation("com.github.YOUR_USERNAME:NetScope:TAG")
+debugImplementation("com.github.god-s-only:NetScope:v1.0.0")
 ```
 
 ### Publishing to Maven Central
