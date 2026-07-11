@@ -20,7 +20,7 @@ class NetScopeInterceptor(private val context: Context) : Interceptor {
     private val gson = Gson()
 
     private val providerUri = Uri.parse(
-        "content://${NetScopeContract.AUTHORITY}/${NetScopeContract.TRANSACTION_PATH}"
+        "content://com.netscope.app.provider/transactions"
     )
 
     override fun intercept(chain: Interceptor.Chain): Response {

@@ -48,6 +48,7 @@ class NetScopeTransactionProvider : ContentProvider() {
     }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
+        Log.d(TAG, "insert() called — url=${values?.getAsString(NetScopeContract.COL_URL)}")
         if (uriMatcher.match(uri) != TRANSACTIONS) return null
         if (values == null) return null
 
